@@ -1,0 +1,62 @@
+/* src/index.css */
+
+/* 🌍 Reset base (sin matar MUI) */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* 🧠 Tipografías y suavizado */
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 🧾 Fondo global (MUI lo controla, pero esto ayuda en carga inicial) */
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+/* 🧱 Root ocupa todo */
+#root {
+  min-height: 100vh;
+}
+
+/* 🖼️ Imágenes responsivas */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* 🔗 Links sin subrayado feo (MUI suele manejarlo) */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 🧰 Inputs heredan font */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* 🧽 Quita estilos raros de listas si usas <ul> */
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}

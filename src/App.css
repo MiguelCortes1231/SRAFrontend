@@ -1,0 +1,53 @@
+/* src/App.css */
+
+/* 🧱 Contenedor general */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 📦 Contenido principal */
+.app-content {
+  flex: 1;
+  display: flex;
+}
+
+/* 🧩 Utilidades simples */
+.text-muted {
+  color: #6b7280; /* gris neutral */
+}
+
+.text-strong {
+  font-weight: 700;
+}
+
+/* 📱 Helpers para responsive */
+.hide-mobile {
+  display: block;
+}
+.show-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none;
+  }
+  .show-mobile {
+    display: block;
+  }
+}
+
+/* 🧼 Scrollbar discreta (opcional, no rompe nada) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.35);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.55);
+}

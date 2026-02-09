@@ -1,0 +1,46 @@
+/* src/styles/app.css */
+
+/* 🌍 Contenedor principal */
+.app-container {
+  min-height: 100vh;
+  background-color: #f3f4f6;
+}
+
+/* 📐 Layout centrado */
+.page-wrapper {
+  padding: 24px;
+}
+
+@media (max-width: 768px) {
+  .page-wrapper {
+    padding: 16px;
+  }
+}
+
+/* 🧾 Header de páginas */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+/* 🧭 Stepper responsive */
+@media (max-width: 600px) {
+  .MuiStepper-root {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 📸 Evidencias */
+.evidence-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+/* 🗺️ Map container fix */
+.leaflet-container {
+  border-radius: 12px;
+}
