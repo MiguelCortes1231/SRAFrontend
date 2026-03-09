@@ -1,31 +1,30 @@
 // src/components/forms/MeetingForm.tsx
 /**
- * 🧾 MeetingForm (FASE 1)
+ * 🧾 MeetingForm (FASE 1 · API REAL)
  * -----------------------------------------
- * ✅ Campos principales:
- * - Tipo (Asamblea/Evento)
- * - Fecha
- * - Sede
- * - Organizador / Enlace
- * - Distrito federal / local
- * - Municipio (Autocomplete) 🧠
- * - Sección (Autocomplete dependiente) 🧠
- * - Dirección (texto)
- * - Ubicación GPS (Mapa manipulable + inputs lat/lng) 📍
+ * Ajustes solicitados por PM / backend ✅
  *
- * 🎯 Resultado:
- * - onSubmit(MeetingCore) listo para crear reunión (mock/API) ✅
+ * 🔢 Orden correcto:
+ * 1. Sección
+ * 2. Municipio
+ * 3. Distrito Local
+ * 4. Distrito Federal
  *
- * ⚠️ Nota:
- * - Se valida que Organizador y Enlace tengan mínimo 3 caracteres.
- *   En tu screenshot, "rr" no pasa (2 letras) → por eso no se habilitaba el botón.
+ * 📌 Reglas:
+ * - Sección es el campo principal
+ * - Municipio / Distrito Local / Distrito Federal:
+ *   - se autollenan desde backend
+ *   - inician deshabilitados
+ *   - NO son editables manualmente
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Autocomplete,
   Box,
   Button,
+  CircularProgress,
   Divider,
   Grid,
   MenuItem,
@@ -36,26 +35,12 @@ import {
 
 import type { MeetingCore, MeetingType } from "../../models/meeting";
 import LocationMap from "../maps/LocationMap";
+import {
+  findSectionById,
+  getSections,
+  type SectionCatalogItem,
+} from "../../services/catalogs.service";
 
-// ✅ Mocks de catálogo (luego vendrán de API)
-const MUNICIPIOS_MOCK = [
-  "OTHÓN P. BLANCO",
-  "BACALAR",
-  "BENITO JUÁREZ",
-  "SOLIDARIDAD",
-  "COZUMEL",
-];
-
-// ✅ Secciones por municipio (mock)
-const SECCIONES_MOCK: Record<string, string[]> = {
-  "OTHÓN P. BLANCO": ["0337", "0378", "1123", "2101"],
-  BACALAR: ["1001", "1002", "1003"],
-  "BENITO JUÁREZ": ["2001", "2002", "2003"],
-  SOLIDARIDAD: ["3001", "3002"],
-  COZUMEL: ["0186", "0190"],
-};
-
-// 🗓️ Fecha default yyyy-mm-dd (input type=date)
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -71,68 +56,110 @@ type Props = {
 };
 
 export default function MeetingForm({ initial, onSubmit, submitting = false }: Props) {
-  // 🧠 Estado local del formulario
+  // 🧠 estado base
   const [type, setType] = useState<MeetingType>((initial?.type as MeetingType) || "ASAMBLEA");
   const [dateISO, setDateISO] = useState(initial?.dateISO || todayISO());
   const [sede, setSede] = useState(initial?.sede || "");
-
   const [address, setAddress] = useState(initial?.address || "");
 
   const [organizerName, setOrganizerName] = useState(initial?.organizer?.name || "");
   const [enlaceName, setEnlaceName] = useState(initial?.enlace?.name || "");
 
-  const [distritoFederal, setDistritoFederal] = useState(initial?.distritoFederal || "");
-  const [distritoLocal, setDistritoLocal] = useState(initial?.distritoLocal || "");
-
-  // ✅ Municipio/Sección (Autocomplete)
-  const [municipio, setMunicipio] = useState(initial?.municipio || "");
+  // ✅ orden solicitado
   const [seccion, setSeccion] = useState(initial?.seccion || "");
+  const [municipio, setMunicipio] = useState(initial?.municipio || "");
+  const [distritoLocal, setDistritoLocal] = useState(initial?.distritoLocal || "");
+  const [distritoFederal, setDistritoFederal] = useState(initial?.distritoFederal || "");
 
-  // 📍 GPS string "lat,lng"
+  // 📍 GPS
   const [gps, setGps] = useState(() => {
     const lat = initial?.location?.lat ?? 18.5001;
     const lng = initial?.location?.lng ?? -88.2961;
     return `${lat.toFixed(6)},${lng.toFixed(6)}`;
   });
 
-  // ✅ Parse GPS -> punto
+  // 📚 catálogo secciones
+  const [sections, setSections] = useState<SectionCatalogItem[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [sectionError, setSectionError] = useState<string | null>(null);
+
+  const [sectionInputText, setSectionInputText] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setSectionsLoading(true);
+        setSectionError(null);
+
+        const rows = await getSections();
+        if (!alive) return;
+        setSections(rows);
+      } catch (err: any) {
+        if (!alive) return;
+        setSectionError(err?.message || "No se pudo cargar catálogo de secciones ❌");
+      } finally {
+        if (!alive) return;
+        setSectionsLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ✅ GPS -> point
   const gpsPoint = useMemo(() => {
     const parts = String(gps).split(",");
     const lat = parseFloat(parts[0]);
     const lng = parseFloat(parts[1]);
+
     return {
       lat: Number.isNaN(lat) ? 0 : lat,
       lng: Number.isNaN(lng) ? 0 : lng,
     };
   }, [gps]);
 
-  // ✅ Opciones de sección dependientes del municipio
-  const seccionesDisponibles = useMemo(() => {
-    return SECCIONES_MOCK[municipio] ?? ["0001", "0002", "0003"];
-  }, [municipio]);
+  // 🔎 sección seleccionada
+  const selectedSection = useMemo(() => {
+    if (!seccion) return null;
+    return sections.find((s) => String(s.IdSeccion) === String(seccion)) ?? null;
+  }, [sections, seccion]);
 
-  // 🧠 Errores visibles (para que no “engañe” el botón)
+  // 🔁 cuando cambia sección -> autollenar
+  useEffect(() => {
+    if (!selectedSection) {
+      setMunicipio("");
+      setDistritoLocal("");
+      setDistritoFederal("");
+      return;
+    }
+
+    setMunicipio(selectedSection.Municipio || "");
+    setDistritoLocal(String(selectedSection.IdDistritoLocal ?? ""));
+    setDistritoFederal(String(selectedSection.IdDistritoFederal ?? ""));
+  }, [selectedSection]);
+
   const errors = useMemo(() => {
     const e: string[] = [];
 
     if (!dateISO) e.push("Fecha requerida 📅");
     if (sede.trim().length < 3) e.push("Sede mínimo 3 caracteres 🏢");
-
     if (organizerName.trim().length < 3) e.push("Organizador mínimo 3 caracteres 👤");
     if (enlaceName.trim().length < 3) e.push("Enlace mínimo 3 caracteres 👤");
 
-    if (distritoFederal.trim().length < 1) e.push("Distrito Federal requerido 🗳️");
-    if (distritoLocal.trim().length < 1) e.push("Distrito Local requerido 🗳️");
+    if (!seccion.trim()) e.push("Sección requerida 🧷");
+    if (!selectedSection) e.push("Sección no encontrada en catálogo ⚠️");
 
-    if (municipio.trim().length < 2) e.push("Municipio requerido 🏙️");
-    if (seccion.trim().length < 1) e.push("Sección requerida 🧷");
+    if (!municipio.trim()) e.push("Municipio no resuelto desde backend 🏙️");
+    if (!distritoLocal.trim()) e.push("Distrito Local no resuelto desde backend 🗳️");
+    if (!distritoFederal.trim()) e.push("Distrito Federal no resuelto desde backend 🗳️");
 
     if (address.trim().length < 5) e.push("Dirección mínimo 5 caracteres 🏠");
 
-    // Validación GPS básica
     if (!gps || String(gps).split(",").length !== 2) e.push("GPS inválido (lat,lng) 📍");
-
-    // lat/lng plausibles
     if (gpsPoint.lat === 0 && gpsPoint.lng === 0) e.push("GPS inválido (0,0) 📍");
 
     return e;
@@ -141,25 +168,57 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
     sede,
     organizerName,
     enlaceName,
-    distritoFederal,
-    distritoLocal,
-    municipio,
     seccion,
+    selectedSection,
+    municipio,
+    distritoLocal,
+    distritoFederal,
     address,
     gps,
     gpsPoint.lat,
     gpsPoint.lng,
   ]);
 
-  const canSubmit = errors.length === 0 && !submitting;
+  const canSubmit = errors.length === 0 && !submitting && !sectionsLoading;
+
+  const handleSectionChange = async (newValue: SectionCatalogItem | null) => {
+    if (!newValue) {
+      setSeccion("");
+      setMunicipio("");
+      setDistritoLocal("");
+      setDistritoFederal("");
+      return;
+    }
+
+    setSeccion(String(newValue.IdSeccion));
+
+    try {
+      const found = await findSectionById(newValue.IdSeccion);
+
+      if (!found) {
+        setMunicipio("");
+        setDistritoLocal("");
+        setDistritoFederal("");
+        setSectionError("Sección no encontrada ❌");
+        return;
+      }
+
+      setSectionError(null);
+      setMunicipio(found.Municipio || "");
+      setDistritoLocal(String(found.IdDistritoLocal ?? ""));
+      setDistritoFederal(String(found.IdDistritoFederal ?? ""));
+    } catch (err: any) {
+      setMunicipio("");
+      setDistritoLocal("");
+      setDistritoFederal("");
+      setSectionError(err?.message || "No se pudo resolver la sección ❌");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!canSubmit) {
-      alert("Revisa campos:\n- " + errors.join("\n- "));
-      return;
-    }
+    if (!canSubmit) return;
 
     const payload: MeetingCore = {
       type,
@@ -185,8 +244,14 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Captura los datos principales. Al guardar, el sistema genera un QR único 🔳
+        Captura los datos principales. La sección autocompleta municipio y distritos desde backend 🔄
       </Typography>
+
+      {sectionError ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {sectionError}
+        </Alert>
+      ) : null}
 
       <Grid container spacing={2}>
         {/* 🏷️ Tipo */}
@@ -227,7 +292,7 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
         <Grid item xs={12} md={6}>
           <TextField
             label="Organizador"
-            placeholder="Nombre completo (mín 3 caracteres)"
+            placeholder="Nombre completo"
             value={organizerName}
             onChange={(e) => setOrganizerName(e.target.value)}
           />
@@ -237,59 +302,87 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
         <Grid item xs={12} md={6}>
           <TextField
             label="Enlace"
-            placeholder="Nombre completo (mín 3 caracteres)"
+            placeholder="Nombre completo"
             value={enlaceName}
             onChange={(e) => setEnlaceName(e.target.value)}
           />
         </Grid>
 
-        {/* 🗳️ Distritos */}
+        {/* =========================================================
+         * 🔢 ORDEN CORRECTO SOLICITADO
+         * 1. Sección
+         * 2. Municipio
+         * 3. Distrito Local
+         * 4. Distrito Federal
+         * ========================================================= */}
+
+        {/* 🧷 Sección */}
         <Grid item xs={12} md={3}>
-          <TextField
-            label="Distrito Federal"
-            placeholder="Ej: 02"
-            value={distritoFederal}
-            onChange={(e) => setDistritoFederal(e.target.value)}
+          <Autocomplete
+            options={sections}
+            loading={sectionsLoading}
+            value={selectedSection}
+            onChange={(_, newValue) => {
+              void handleSectionChange(newValue);
+            }}
+            inputValue={sectionInputText}
+            onInputChange={(_, newInputValue) => {
+              setSectionInputText(newInputValue);
+            }}
+            getOptionLabel={(option) => String(option.IdSeccion)}
+            isOptionEqualToValue={(option, value) =>
+              String(option.IdSeccion) === String(value.IdSeccion)
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Sección"
+                placeholder="Selecciona sección"
+                helperText="Campo principal"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {sectionsLoading ? <CircularProgress color="inherit" size={18} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
           />
         </Grid>
 
+        {/* 🏙️ Municipio */}
+        <Grid item xs={12} md={3}>
+          <TextField
+            label="Municipio"
+            value={municipio}
+            disabled
+            placeholder="Autorrellenado"
+            helperText="Se llena automáticamente"
+          />
+        </Grid>
+
+        {/* 🗳️ Distrito Local */}
         <Grid item xs={12} md={3}>
           <TextField
             label="Distrito Local"
-            placeholder="Ej: 14"
             value={distritoLocal}
-            onChange={(e) => setDistritoLocal(e.target.value)}
+            disabled
+            placeholder="Autorrellenado"
+            helperText="Se llena automáticamente"
           />
         </Grid>
 
-        {/* 🏙️ Municipio (Autocomplete) */}
+        {/* 🗳️ Distrito Federal */}
         <Grid item xs={12} md={3}>
-          <Autocomplete
-            options={MUNICIPIOS_MOCK}
-            value={municipio || null}
-            onChange={(_, newValue) => {
-              const v = newValue ?? "";
-              setMunicipio(v);
-
-              // 🧠 Si cambia municipio, reset sección
-              setSeccion("");
-            }}
-            renderInput={(params) => (
-              <TextField {...params} label="Municipio" placeholder="Selecciona municipio" />
-            )}
-          />
-        </Grid>
-
-        {/* 🧷 Sección (Autocomplete dependiente) */}
-        <Grid item xs={12} md={3}>
-          <Autocomplete
-            options={seccionesDisponibles}
-            value={seccion || null}
-            onChange={(_, newValue) => setSeccion(newValue ?? "")}
-            freeSolo
-            renderInput={(params) => (
-              <TextField {...params} label="Sección" placeholder="Ej: 0378" />
-            )}
+          <TextField
+            label="Distrito Federal"
+            value={distritoFederal}
+            disabled
+            placeholder="Autorrellenado"
+            helperText="Se llena automáticamente"
           />
         </Grid>
 
@@ -305,33 +398,25 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
           />
         </Grid>
 
-        {/* 🗺️ Mapa */}
+        {/* 🗺️ GPS */}
         <Grid item xs={12}>
           <Divider sx={{ my: 1 }} />
           <Typography sx={{ fontWeight: 900, mb: 1 }}>Ubicación GPS 📍</Typography>
           <LocationMap value={gps} onChange={setGps} />
         </Grid>
 
-        {/* ✅ Errores visibles */}
+        {/* ⚠️ errores */}
         {errors.length > 0 ? (
           <Grid item xs={12}>
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2,
-                bgcolor: "rgba(245,158,11,0.10)",
-                border: "1px solid rgba(245,158,11,0.30)",
-              }}
-            >
-              <Typography sx={{ fontWeight: 900 }}>Faltan campos ⚠️</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {errors.join(" · ")}
-              </Typography>
-            </Box>
+            <Alert severity="warning">
+              <strong>Faltan campos o datos resueltos:</strong>
+              <br />
+              {errors.join(" · ")}
+            </Alert>
           </Grid>
         ) : null}
 
-        {/* ✅ Submit */}
+        {/* ✅ submit */}
         <Grid item xs={12}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -350,7 +435,7 @@ export default function MeetingForm({ initial, onSubmit, submitting = false }: P
           </Stack>
 
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-            💡 Tip: Organizador y Enlace deben tener mínimo 3 caracteres.
+            💡 La reunión se guarda en backend antes de permitir avanzar de fase.
           </Typography>
         </Grid>
       </Grid>
