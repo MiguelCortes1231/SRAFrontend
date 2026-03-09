@@ -2,19 +2,79 @@
 /**
  * 🔁 Evidence Service
  * -----------------------------------------
- * - UI llama aquí siempre
- * - Hoy usa mocks 🧪
- * - Mañana cambia a API 🔁
+ * ✅ REAL API:
+ * - getProtectedImageBlobUrl()
+ * - uploadPhase2()
+ *
+ * 🧪 MOCK:
+ * - addEvidence()
+ * - removeEvidence()
+ *
+ * Nota:
+ * Las imágenes protegidas NO deben usarse directo en <img src="...">
+ * porque requieren Authorization header. Por eso aquí las pedimos como blob.
  */
 
-import type { EvidencePlatform, EvidenceType } from "../models/evidence";
+import { http } from "./http";
 import type { Meeting } from "../models/meeting";
+import type { EvidencePlatform, EvidenceType } from "../models/evidence";
+
+// 🧪 mocks temporales
 import { mockAddEvidence, mockRemoveEvidence } from "../mocks/evidence.mock";
 
-// const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
-const USE_MOCK = true;
+/** 🔐 Obtiene una imagen protegida como blob URL */
+export async function getProtectedImageBlobUrl(filePath: string): Promise<string> {
+  const res = await http.get("/getImage", {
+    params: { url: filePath },
+    responseType: "blob",
+  });
 
-/** 📤 Agregar evidencia */
+  return URL.createObjectURL(res.data);
+}
+
+/** 📤 Fase 2 real */
+export async function uploadPhase2(params: {
+  agendaId: string | number;
+  facebookFile?: File | null;
+  youtubeFile?: File | null;
+  whatsappFile?: File | null;
+  facebookValue?: number | null;
+  youtubeValue?: number | null;
+  whatsappValue?: number | null;
+}): Promise<Meeting> {
+  const fd = new FormData();
+
+  if (params.facebookFile) fd.append("Facebook1", params.facebookFile);
+  if (params.youtubeFile) fd.append("Youtube1", params.youtubeFile);
+  if (params.whatsappFile) fd.append("Whatsapp1", params.whatsappFile);
+
+  if (params.facebookValue !== undefined && params.facebookValue !== null) {
+    fd.append("FacebookValor1", String(params.facebookValue));
+  }
+
+  if (params.youtubeValue !== undefined && params.youtubeValue !== null) {
+    fd.append("YoutubeValor1", String(params.youtubeValue));
+  }
+
+  if (params.whatsappValue !== undefined && params.whatsappValue !== null) {
+    fd.append("WhatsappValor1", String(params.whatsappValue));
+  }
+
+  await http.post(`/fase2/${params.agendaId}`, fd, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  // ✅ después de guardar, volvemos a pedir la agenda real actualizada
+  const { getMeeting } = await import("./meetings.service");
+  return getMeeting(String(params.agendaId));
+}
+
+/* =========================================================
+ * 🧪 MOCK TEMPORAL PARA OTRAS FASES
+ * ========================================================= */
+
 export async function addEvidence(params: {
   meetingId: string;
   type: EvidenceType;
@@ -22,12 +82,9 @@ export async function addEvidence(params: {
   imageUrl: string;
   notes?: string;
 }): Promise<Meeting> {
-  if (USE_MOCK) return mockAddEvidence(params);
-  throw new Error("API no configurada todavía 🚧");
+  return mockAddEvidence(params);
 }
 
-/** 🗑️ Quitar evidencia */
 export async function removeEvidence(meetingId: string, evidenceId: string): Promise<Meeting> {
-  if (USE_MOCK) return mockRemoveEvidence(meetingId, evidenceId);
-  throw new Error("API no configurada todavía 🚧");
+  return mockRemoveEvidence(meetingId, evidenceId);
 }

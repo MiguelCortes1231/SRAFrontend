@@ -2,13 +2,14 @@
 /**
  * 📸 Modelo: Evidencia
  * -----------------------------------------
- * Fase 2: Evidencia Inicial Digital (YT/FB)
- * Fase 4: Foto grupal
- * Fase 5: Evidencia Final Digital (YT/FB)
+ * Soporta:
+ * - Fase 2 inicial (YT / FB / WA)
+ * - Fase 4 foto grupal
+ * - Fase 5 final (YT / FB / WA)
  */
 
 export type EvidenceType = "INICIAL_DIGITAL" | "FINAL_DIGITAL" | "FOTO_GRUPAL";
-export type EvidencePlatform = "YT" | "FB" | "FISICA";
+export type EvidencePlatform = "YT" | "FB" | "WA" | "FISICA";
 
 export type Evidence = {
   id: string;
@@ -17,17 +18,19 @@ export type Evidence = {
   type: EvidenceType;
   platform: EvidencePlatform;
 
-  // 🖼️ Imagen (por ahora base64 o URL local mock)
+  // 🖼️ path original backend
+  imagePath?: string | null;
+
+  // 🖼️ URL resuelta o blob URL
   imageUrl: string;
 
-  // 🧾 Metadata extra (puede crecer con API)
-  createdAtISO: string;
+  // 🔢 valor capturado en esa red (suscriptores / seguidores / etc.)
+  value?: number | null;
 
-  // 🏷️ Observaciones / notas (auditoría)
+  createdAtISO: string;
   notes?: string;
 };
 
-/** 🧠 Helpers: validación rápida */
 export function isDigitalEvidence(e: Evidence) {
   return e.type === "INICIAL_DIGITAL" || e.type === "FINAL_DIGITAL";
 }

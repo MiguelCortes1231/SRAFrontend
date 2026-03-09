@@ -2,97 +2,165 @@
 /**
  * 📤 EvidenceUploadCard
  * -----------------------------------------
- * Sirve para Fase 2 y Fase 5:
- * - Subir 1 screenshot YT + 1 screenshot FB
- * - Previsualización
- * - Guardar como evidencia en mock db 🧠
+ * ✅ Fase 2 real:
+ * - Facebook1 + FacebookValor1
+ * - Youtube1 + YoutubeValor1
+ * - Whatsapp1 + WhatsappValor1
+ *
+ * 🔥 Puede reemplazar imágenes siempre
+ * 🔔 Usa toasts
  */
 
-import React, { useMemo, useRef, useState } from "react";
-import { Box, Button, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
-import ImageIcon from "@mui/icons-material/Image";
+import React, { useMemo, useState } from "react";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+
+import FacebookIcon from "@mui/icons-material/Facebook";
+import YouTubeIcon from "@mui/icons-material/YouTube";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
+import SaveIcon from "@mui/icons-material/Save";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
-import type { EvidenceType } from "../../models/evidence";
+import { toast } from "react-toastify";
+
 import type { Meeting } from "../../models/meeting";
-import { addEvidence, removeEvidence } from "../../services/evidence.service";
+import ProtectedImage from "./ProtectedImage";
+import { uploadPhase2 } from "../../services/evidence.service";
 
 type Props = {
   meeting: Meeting;
-  type: EvidenceType; // INICIAL_DIGITAL o FINAL_DIGITAL
   title: string;
   description: string;
   onUpdated: (meeting: Meeting) => void;
 };
 
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-export default function EvidenceUploadCard({ meeting, type, title, description, onUpdated }: Props) {
-  const ytRef = useRef<HTMLInputElement>(null);
-  const fbRef = useRef<HTMLInputElement>(null);
-
+export default function EvidenceUploadCard({
+  meeting,
+  title,
+  description,
+  onUpdated,
+}: Props) {
   const [loading, setLoading] = useState(false);
 
-  const ytEvidence = useMemo(
-    () => meeting.evidences.find((e) => e.type === type && e.platform === "YT"),
-    [meeting.evidences, type]
-  );
-  const fbEvidence = useMemo(
-    () => meeting.evidences.find((e) => e.type === type && e.platform === "FB"),
-    [meeting.evidences, type]
+  // 📸 Files nuevos (opcionales)
+  const [facebookFile, setFacebookFile] = useState<File | null>(null);
+  const [youtubeFile, setYoutubeFile] = useState<File | null>(null);
+  const [whatsappFile, setWhatsappFile] = useState<File | null>(null);
+
+  // 🔢 Valores
+  const initialFacebook = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "FB"
+      ),
+    [meeting.evidences]
   );
 
-  const handlePick = (ref: React.RefObject<HTMLInputElement>) => ref.current?.click();
+  const initialYoutube = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "YT"
+      ),
+    [meeting.evidences]
+  );
 
-  const handleUpload = async (platform: "YT" | "FB", file: File) => {
+  const initialWhatsapp = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "WA"
+      ),
+    [meeting.evidences]
+  );
+
+  const [facebookValue, setFacebookValue] = useState<number | "">(
+    initialFacebook?.value ?? ""
+  );
+  const [youtubeValue, setYoutubeValue] = useState<number | "">(
+    initialYoutube?.value ?? ""
+  );
+  const [whatsappValue, setWhatsappValue] = useState<number | "">(
+    initialWhatsapp?.value ?? ""
+  );
+
+  const canSave = !loading;
+
+  const handleSave = async () => {
     try {
       setLoading(true);
-      const base64 = await toBase64(file);
 
-      const updated = await addEvidence({
-        meetingId: meeting.id,
-        type,
-        platform,
-        imageUrl: base64,
+      const updated = await uploadPhase2({
+        agendaId: meeting.id,
+        facebookFile,
+        youtubeFile,
+        whatsappFile,
+        facebookValue: facebookValue === "" ? null : Number(facebookValue),
+        youtubeValue: youtubeValue === "" ? null : Number(youtubeValue),
+        whatsappValue: whatsappValue === "" ? null : Number(whatsappValue),
       });
 
       onUpdated(updated);
+
+      setFacebookFile(null);
+      setYoutubeFile(null);
+      setWhatsappFile(null);
+
+      toast.success("✅ Fase 2 guardada correctamente");
     } catch (err: any) {
-      alert(err?.message || "No se pudo guardar la evidencia ❌");
+      toast.error(err?.message || "❌ No se pudo guardar Fase 2");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemove = async (evidenceId: string) => {
-    try {
-      setLoading(true);
-      const updated = await removeEvidence(meeting.id, evidenceId);
-      onUpdated(updated);
-    } catch (err: any) {
-      alert(err?.message || "No se pudo eliminar la evidencia ❌");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const socialCards = [
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: <FacebookIcon color="primary" />,
+      existing: initialFacebook,
+      file: facebookFile,
+      setFile: setFacebookFile,
+      value: facebookValue,
+      setValue: setFacebookValue,
+    },
+    {
+      key: "youtube",
+      label: "YouTube",
+      icon: <YouTubeIcon color="error" />,
+      existing: initialYoutube,
+      file: youtubeFile,
+      setFile: setYoutubeFile,
+      value: youtubeValue,
+      setValue: setYoutubeValue,
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: <WhatsAppIcon sx={{ color: "#16a34a" }} />,
+      existing: initialWhatsapp,
+      file: whatsappFile,
+      setFile: setWhatsappFile,
+      value: whatsappValue,
+      setValue: setWhatsappValue,
+    },
+  ];
 
   return (
     <Card>
       <CardContent>
         <Stack spacing={1}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <ImageIcon color="primary" />
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>
-              {title}
-            </Typography>
-          </Stack>
+          <Typography variant="h6" sx={{ fontWeight: 900 }}>
+            {title}
+          </Typography>
 
           <Typography variant="body2" color="text.secondary">
             {description}
@@ -100,107 +168,86 @@ export default function EvidenceUploadCard({ meeting, type, title, description, 
 
           <Divider sx={{ my: 1 }} />
 
-          {/* 🎬 YouTube */}
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 900 }}>YouTube (1 imagen) 🎬</Typography>
-              {ytEvidence ? (
-                <Box className="evidence-preview" sx={{ mt: 1 }}>
-                  <img src={ytEvidence.imageUrl} alt="YT Evidence" />
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Sin evidencia cargada 🫙
-                </Typography>
-              )}
-
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                <input
-                  ref={ytRef}
-                  hidden
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleUpload("YT", f);
+          <Grid container spacing={2}>
+            {socialCards.map((item) => (
+              <Grid item xs={12} md={4} key={item.key}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 3,
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    bgcolor: "#fff",
+                    height: "100%",
                   }}
-                />
-                <Button
-                  variant="contained"
-                  startIcon={<UploadFileIcon />}
-                  disabled={loading}
-                  onClick={() => handlePick(ytRef)}
-                  sx={{ borderRadius: 2 }}
                 >
-                  {ytEvidence ? "Reemplazar" : "Subir"} 📤
-                </Button>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    {item.icon}
+                    <Typography sx={{ fontWeight: 900 }}>{item.label}</Typography>
+                  </Stack>
 
-                {ytEvidence ? (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    disabled={loading}
-                    onClick={() => handleRemove(ytEvidence.id)}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Quitar 🗑️
-                  </Button>
-                ) : null}
-              </Stack>
-            </Box>
+                  {/* 🖼️ Imagen actual protegida */}
+                  <ProtectedImage
+                    filePath={item.existing?.imagePath}
+                    alt={`${item.label} evidencia`}
+                    height={220}
+                  />
 
-            {/* 📘 Facebook */}
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 900 }}>Facebook (1 imagen) 📘</Typography>
-              {fbEvidence ? (
-                <Box className="evidence-preview" sx={{ mt: 1 }}>
-                  <img src={fbEvidence.imageUrl} alt="FB Evidence" />
+                  <Stack spacing={1.2} sx={{ mt: 1.2 }}>
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={<UploadFileIcon />}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {item.existing?.imagePath ? "Reemplazar imagen" : "Subir imagen"}
+                      <input
+                        hidden
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] ?? null;
+                          item.setFile(file);
+                          if (file) {
+                            toast.info(`📤 Imagen lista para ${item.label}`);
+                          }
+                        }}
+                      />
+                    </Button>
+
+                    {item.file ? (
+                      <Typography variant="caption" color="text.secondary">
+                        Archivo nuevo: <strong>{item.file.name}</strong>
+                      </Typography>
+                    ) : null}
+
+                    <TextField
+                      label={`Valor actual en ${item.label}`}
+                      type="number"
+                      value={item.value}
+                      onChange={(e) =>
+                        item.setValue(e.target.value === "" ? "" : Number(e.target.value))
+                      }
+                      placeholder="Ej: 100"
+                    />
+                  </Stack>
                 </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Sin evidencia cargada 🫙
-                </Typography>
-              )}
+              </Grid>
+            ))}
+          </Grid>
 
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                <input
-                  ref={fbRef}
-                  hidden
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleUpload("FB", f);
-                  }}
-                />
-                <Button
-                  variant="contained"
-                  startIcon={<UploadFileIcon />}
-                  disabled={loading}
-                  onClick={() => handlePick(fbRef)}
-                  sx={{ borderRadius: 2 }}
-                >
-                  {fbEvidence ? "Reemplazar" : "Subir"} 📤
-                </Button>
+          <Divider sx={{ my: 2 }} />
 
-                {fbEvidence ? (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    disabled={loading}
-                    onClick={() => handleRemove(fbEvidence.id)}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Quitar 🗑️
-                  </Button>
-                ) : null}
-              </Stack>
-            </Box>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end">
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              disabled={!canSave}
+              onClick={handleSave}
+              sx={{ borderRadius: 2 }}
+            >
+              {loading ? "Guardando Fase 2... ⏳" : "Guardar Fase 2 📤"}
+            </Button>
           </Stack>
-
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-            ✅ Requisito: 1 captura YT + 1 captura FB
-          </Typography>
         </Stack>
       </CardContent>
     </Card>

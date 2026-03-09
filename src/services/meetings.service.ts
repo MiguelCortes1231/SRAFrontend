@@ -13,10 +13,6 @@
  * - addAdultAttendance()
  * - addMinorAttendance()
  * - deleteMeeting()
- *
- * 🧠 Idea:
- * - Fase 1 ya persiste en backend real
- * - Fases 2..6 siguen mock hasta que backend libere endpoints
  */
 
 import { http } from "./http";
@@ -34,7 +30,7 @@ import { computeMeetingMetrics, computeMeetingStatus } from "../models/meeting";
 import type { AttendanceAdult, AttendanceMinor } from "../models/attendance";
 import { buildQrValue } from "../utils/id";
 
-// 🧪 mock temporal para fases no liberadas
+// 🧪 mocks temporales
 import {
   mockAddAdultAttendance,
   mockAddMinorAttendance,
@@ -43,7 +39,6 @@ import {
 } from "../mocks/meetings.mock";
 import { loadDB, saveDB } from "../mocks/db";
 
-/** 🌐 Respuesta create agenda */
 type StoreAgendaResponse = {
   success: boolean;
   message: string;
@@ -67,7 +62,6 @@ type StoreAgendaResponse = {
   };
 };
 
-/** 🌐 Fila agenda backend */
 type AgendaApiRow = {
   IdAgenda: number;
   IdReunion: number;
@@ -106,15 +100,10 @@ type GetAgendasResponse = {
   data: AgendaApiRow[];
 };
 
-/** 🔗 Base pública de archivos */
-const API_PUBLIC_ORIGIN = "https://servdes1.proyectoqroo.com.mx/gsv/ibeta";
-
-/** 🖼️ Convierte ruta relativa a URL */
-function toFileUrl(path: string | null): string | null {
-  if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${API_PUBLIC_ORIGIN}/storage/${path.replace(/^\/+/, "")}`;
-}
+type GetAgendaResponse = {
+  success: boolean;
+  data: AgendaApiRow;
+};
 
 /** 🔢 Front -> Backend */
 function meetingTypeToIdReunion(type: MeetingType): number {
@@ -126,7 +115,7 @@ function idReunionToMeetingType(idReunion: number): MeetingType {
   return Number(idReunion) === 1 ? "ASAMBLEA" : "EVENTO";
 }
 
-/** 🧭 Backend fase numérica -> flow frontend */
+/** 🧭 Backend fase -> flow */
 function phaseNumberToFlow(fase: number): MeetingFlow {
   return {
     1: fase >= 1 ? "COMPLETADA" : "PENDIENTE",
@@ -138,7 +127,6 @@ function phaseNumberToFlow(fase: number): MeetingFlow {
   };
 }
 
-/** 🧠 Sync real -> mock local */
 function upsertMeetingToMock(meeting: Meeting) {
   const db = loadDB();
   const idx = db.meetings.findIndex((m) => m.id === meeting.id);
@@ -149,19 +137,20 @@ function upsertMeetingToMock(meeting: Meeting) {
   saveDB(db);
 }
 
-/** 🧩 Mapea agenda backend -> modelo frontend */
 async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
   const section = await findSectionById(row.IdSeccion);
   const flow = phaseNumberToFlow(Number(row.Fase || 1));
 
-  const evidences = [
+  const evidences: Meeting["evidences"] = [
     row.Youtube1
       ? {
           id: `yt1-${row.IdAgenda}`,
           meetingId: String(row.IdAgenda),
-          type: "INICIAL_DIGITAL" as const,
-          platform: "YT" as const,
-          imageUrl: toFileUrl(row.Youtube1)!,
+          type: "INICIAL_DIGITAL",
+          platform: "YT",
+          imagePath: row.Youtube1,
+          imageUrl: "",
+          value: row.YoutubeValor1,
           createdAtISO: row.updated_at,
         }
       : null,
@@ -169,9 +158,23 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
       ? {
           id: `fb1-${row.IdAgenda}`,
           meetingId: String(row.IdAgenda),
-          type: "INICIAL_DIGITAL" as const,
-          platform: "FB" as const,
-          imageUrl: toFileUrl(row.Facebook1)!,
+          type: "INICIAL_DIGITAL",
+          platform: "FB",
+          imagePath: row.Facebook1,
+          imageUrl: "",
+          value: row.FacebookValor1,
+          createdAtISO: row.updated_at,
+        }
+      : null,
+    row.Whatsapp1
+      ? {
+          id: `wa1-${row.IdAgenda}`,
+          meetingId: String(row.IdAgenda),
+          type: "INICIAL_DIGITAL",
+          platform: "WA",
+          imagePath: row.Whatsapp1,
+          imageUrl: "",
+          value: row.WhatsappValor1,
           createdAtISO: row.updated_at,
         }
       : null,
@@ -179,9 +182,10 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
       ? {
           id: `foto-${row.IdAgenda}`,
           meetingId: String(row.IdAgenda),
-          type: "FOTO_GRUPAL" as const,
-          platform: "FISICA" as const,
-          imageUrl: toFileUrl(row.FotoGrupal)!,
+          type: "FOTO_GRUPAL",
+          platform: "FISICA",
+          imagePath: row.FotoGrupal,
+          imageUrl: "",
           createdAtISO: row.updated_at,
         }
       : null,
@@ -189,9 +193,11 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
       ? {
           id: `yt2-${row.IdAgenda}`,
           meetingId: String(row.IdAgenda),
-          type: "FINAL_DIGITAL" as const,
-          platform: "YT" as const,
-          imageUrl: toFileUrl(row.Youtube2)!,
+          type: "FINAL_DIGITAL",
+          platform: "YT",
+          imagePath: row.Youtube2,
+          imageUrl: "",
+          value: row.YoutubeValor2,
           createdAtISO: row.updated_at,
         }
       : null,
@@ -199,9 +205,23 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
       ? {
           id: `fb2-${row.IdAgenda}`,
           meetingId: String(row.IdAgenda),
-          type: "FINAL_DIGITAL" as const,
-          platform: "FB" as const,
-          imageUrl: toFileUrl(row.Facebook2)!,
+          type: "FINAL_DIGITAL",
+          platform: "FB",
+          imagePath: row.Facebook2,
+          imageUrl: "",
+          value: row.FacebookValor2,
+          createdAtISO: row.updated_at,
+        }
+      : null,
+    row.Whatsapp2
+      ? {
+          id: `wa2-${row.IdAgenda}`,
+          meetingId: String(row.IdAgenda),
+          type: "FINAL_DIGITAL",
+          platform: "WA",
+          imagePath: row.Whatsapp2,
+          imageUrl: "",
+          value: row.WhatsappValor2,
           createdAtISO: row.updated_at,
         }
       : null,
@@ -215,7 +235,6 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
     status: computeMeetingStatus(flow),
 
     core: {
-      // ✅ Ahora sí tomamos el tipo real desde backend
       type: idReunionToMeetingType(row.IdReunion),
       dateISO: String(row.FechaAgenda).slice(0, 10),
       sede: row.Sede || "",
@@ -257,7 +276,6 @@ async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
   return meeting;
 }
 
-/** 📋 Obtener todas las agendas */
 export async function listMeetings(): Promise<Meeting[]> {
   const res = await http.get<GetAgendasResponse>("/getAgendas");
   const rows = Array.isArray(res.data?.data) ? res.data.data : [];
@@ -268,7 +286,6 @@ export async function listMeetings(): Promise<Meeting[]> {
   return meetings.sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
 }
 
-/** 📅 Obtener agendas por fecha */
 export async function listMeetingsByDate(dateISO: string): Promise<Meeting[]> {
   const res = await http.get<GetAgendasResponse>("/getAgendas", {
     params: { FechaAgenda: dateISO },
@@ -281,22 +298,22 @@ export async function listMeetingsByDate(dateISO: string): Promise<Meeting[]> {
   return meetings.sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
 }
 
-/** 🔎 Obtener una agenda */
+/** ✅ Ahora sí real por IdAgenda */
 export async function getMeeting(meetingId: string): Promise<Meeting> {
-  // ⚠️ Backend aún no pasó endpoint individual
-  const all = await listMeetings();
-  const found = all.find((m) => m.id === String(meetingId));
+  const res = await http.get<GetAgendaResponse>(`/getAgenda/${meetingId}`);
+  const row = res.data?.data;
 
-  if (!found) throw new Error("Reunión no encontrada ❌");
-  return found;
+  if (!row) throw new Error("Reunión no encontrada ❌");
+
+  const meeting = await mapAgendaRowToMeeting(row);
+  upsertMeetingToMock(meeting);
+
+  return meeting;
 }
 
-/** ➕ Crear agenda real */
 export async function createMeeting(core: MeetingCore): Promise<Meeting> {
   const payload = {
-    // ✅ ESTO ERA LO QUE FALTABA
     IdReunion: meetingTypeToIdReunion(core.type),
-
     FechaAgenda: core.dateISO,
     Sede: core.sede,
     Organizador: core.organizer.name,
@@ -348,7 +365,7 @@ export async function createMeeting(core: MeetingCore): Promise<Meeting> {
 }
 
 /* =========================================================
- * 🧪 MOCK TEMPORAL PARA FASES 2..6
+ * 🧪 MOCK TEMPORAL OTRAS FASES
  * ========================================================= */
 
 export async function setPhaseStatus(
