@@ -1,8 +1,7 @@
 // src/layouts/MainLayout.tsx
 /**
- * 🧱 Layout principal de la app
- * - Topbar + Sidebar responsive 📱💻
- * - Menú claro: Dashboard / Reuniones / Escaneo (futuro) 🧭
+ * 🧱 Layout principal
+ * Solo te dejo completo para evitar choques
  */
 
 import React, { useMemo, useState } from "react";
@@ -24,15 +23,15 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
-// 🎯 Icons
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import EventNoteIcon from "@mui/icons-material/EventNote";
-import QrCode2Icon from "@mui/icons-material/QrCode2";
 import LogoutIcon from "@mui/icons-material/Logout";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
 
-import { AUTH_TOKEN_KEY } from "../app/guards/RequireAuth";
+import { logout } from "../services/auth.service";
+import { getUser } from "../store/auth.store";
 
 const drawerWidth = 270;
 
@@ -42,6 +41,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const user = getUser();
 
   const menuItems = useMemo(
     () => [
@@ -55,17 +55,12 @@ export default function MainLayout() {
   const handleToggleDrawer = () => setMobileOpen((v) => !v);
 
   const handleLogout = () => {
-    // 🚪 Logout simple (mock)
-    try {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-      localStorage.removeItem(AUTH_TOKEN_KEY); // doble por seguridad (sin daño)
-    } catch {}
+    logout();
     navigate("/login", { replace: true });
   };
 
   const drawerContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* 🏷️ Logo / Nombre */}
       <Box sx={{ px: 2.2, py: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
           Reuniones & Auditoría
@@ -73,11 +68,21 @@ export default function MainLayout() {
         <Typography variant="caption" color="text.secondary">
           Evidencias · Asistencias · QR · Impacto 📸✅🔳
         </Typography>
+
+        {user ? (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {user.nombre}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              @{user.username}
+            </Typography>
+          </Box>
+        ) : null}
       </Box>
 
       <Divider />
 
-      {/* 🧭 Menú */}
       <List sx={{ px: 1 }}>
         {menuItems.map((item) => (
           <ListItemButton
@@ -105,7 +110,6 @@ export default function MainLayout() {
 
       <Divider />
 
-      {/* 🚪 Logout */}
       <Box sx={{ p: 2 }}>
         <Button
           fullWidth
@@ -122,7 +126,6 @@ export default function MainLayout() {
 
   return (
     <Box className="app-shell">
-      {/* 🧠 TOPBAR */}
       <AppBar
         position="sticky"
         elevation={0}
@@ -134,7 +137,6 @@ export default function MainLayout() {
         }}
       >
         <Toolbar sx={{ gap: 1 }}>
-          {/* 🍔 Menú en móvil */}
           {isMobile && (
             <IconButton onClick={handleToggleDrawer} edge="start" aria-label="menu">
               <MenuIcon />
@@ -145,7 +147,6 @@ export default function MainLayout() {
             Control de Reuniones 🧭
           </Typography>
 
-          {/* 🔳 Acceso rápido (ejemplo) */}
           <IconButton
             aria-label="qr"
             onClick={() => navigate("/meetings/new")}
@@ -157,7 +158,6 @@ export default function MainLayout() {
       </AppBar>
 
       <Box className="app-content">
-        {/* 🧱 Drawer Desktop */}
         {!isMobile && (
           <Drawer
             variant="permanent"
@@ -175,7 +175,6 @@ export default function MainLayout() {
           </Drawer>
         )}
 
-        {/* 📱 Drawer Mobile */}
         {isMobile && (
           <Drawer
             variant="temporary"
@@ -193,7 +192,6 @@ export default function MainLayout() {
           </Drawer>
         )}
 
-        {/* 📄 Contenido */}
         <Box component="main" sx={{ flex: 1 }}>
           <div className="page-wrapper">
             <Outlet />

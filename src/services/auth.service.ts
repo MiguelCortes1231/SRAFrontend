@@ -1,32 +1,52 @@
 // src/services/auth.service.ts
 /**
- * 🔁 Auth Service (Mock-first)
- * - Unifica acceso a login
- * - Cambia un switch y listo: mock → API real 🌐
+ * 🔁 Auth Service
+ * -----------------------------------------
+ * Login real contra API JWT
  */
 
-import { mockLogin, type LoginPayload, type LoginResponse } from "../mocks/auth.mock";
-import { setSession, clearSession } from "../store/auth.store";
+import { http } from "./http";
+import { clearSession, setSession, type AuthUser } from "../store/auth.store";
 
-// ✅ Flag para cambiar mock → api
-// Hoy dejamos mock = true porque NO hay API aún 🧪
-const USE_MOCK = true;
+export type LoginPayload = {
+  username: string;
+  password: string;
+};
 
-/** ✅ Login (mock o api) */
-export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  if (USE_MOCK) {
-    const res = await mockLogin(payload);
-    // 🗝️ Guardamos sesión aquí (single source)
-    setSession(res.token, res.user);
-    return res;
-  }
+type LoginApiResponse = {
+  token: string;
+  type: string; // "Bearer"
+  expires_in: number;
+  user: {
+    id: number;
+    username: string;
+    nombre: string;
+  };
+};
 
-  // 🌐 FUTURO: API real
-  // const res = await http.post<LoginResponse>("/auth/login", payload);
-  // setSession(res.data.token, res.data.user);
-  // return res.data;
+/** 🔐 Login real */
+export async function login(payload: LoginPayload) {
+  const res = await http.post<LoginApiResponse>("/loginjwt", {
+    username: payload.username,
+    password: payload.password,
+  });
 
-  throw new Error("API no configurada todavía 🚧");
+  const data = res.data;
+
+  const user: AuthUser = {
+    id: data.user.id,
+    username: data.user.username,
+    nombre: data.user.nombre,
+  };
+
+  setSession({
+    token: data.token,
+    tokenType: data.type || "Bearer",
+    expiresIn: data.expires_in,
+    user,
+  });
+
+  return data;
 }
 
 /** 🚪 Logout */

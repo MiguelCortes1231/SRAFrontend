@@ -1,28 +1,52 @@
 // src/services/http.ts
 /**
  * 🌐 Axios base
- * - Hoy: puede no usarse si estamos full mock
- * - Mañana: lo usas para conectar con API real 🔁
+ * -----------------------------------------
+ * - Usa JWT automáticamente
+ * - Si expira la sesión, limpia storage
  */
 
 import axios from "axios";
-import { getToken } from "../store/auth.store";
+import {
+  clearSession,
+  getToken,
+  getTokenType,
+  isAuthenticated,
+} from "../store/auth.store";
 
-// 🔧 Aquí después pones tu API base (cuando te lo den)
-// Ej: https://api.reuniones.qroo.gob.mx
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://servdes1.proyectoqroo.com.mx/gsv/ibeta/api";
 
 export const http = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // ⏳ 30s
+  timeout: 30000,
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  },
 });
 
-/** 🛡️ Interceptor para token */
+/** 🛡️ Request interceptor */
 http.interceptors.request.use((config) => {
   const token = getToken();
-  if (token) {
+
+  if (token && isAuthenticated()) {
     config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `${getTokenType()} ${token}`;
   }
+
   return config;
 });
+
+/** 🚨 Response interceptor */
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // 🔒 Si backend responde no autorizado
+    if (error?.response?.status === 401) {
+      clearSession();
+    }
+    return Promise.reject(error);
+  }
+);

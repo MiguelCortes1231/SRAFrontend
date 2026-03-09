@@ -1,8 +1,6 @@
 // src/pages/auth/LoginPage.tsx
 /**
- * 🔑 Login Page
- * - Sin registro (solo credenciales dadas) ✅
- * - UX profesional: loading, error, redirección 🔁
+ * 🔑 Login real con JWT
  */
 
 import React, { useMemo, useState } from "react";
@@ -62,14 +60,14 @@ export default function LoginPage() {
         password,
       });
 
-      // ✅ Redirige a donde intentaba entrar
       navigate(redirectTo, { replace: true });
     } catch (err: any) {
-      // ❌ Mensaje humano
-      const msg =
+      const apiMsg =
+        err?.response?.data?.message ||
         err?.message ||
-        "No se pudo iniciar sesión. Verifica tus credenciales y conexión.";
-      setErrorMsg(msg);
+        "No se pudo iniciar sesión ❌";
+
+      setErrorMsg(apiMsg);
     } finally {
       setLoading(false);
     }
@@ -77,24 +75,21 @@ export default function LoginPage() {
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
-      {/* 🧠 Mensaje si viene de ruta protegida */}
       {state.from && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Para acceder a <strong>{state.from}</strong>, inicia sesión 🔐
         </Alert>
       )}
 
-      {/* ❌ Error */}
       {errorMsg && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {errorMsg}
         </Alert>
       )}
 
-      {/* 👤 Usuario */}
       <TextField
         label="Usuario"
-        placeholder="Ej: admin"
+        placeholder="Ej: gsvopb"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         autoComplete="username"
@@ -108,7 +103,6 @@ export default function LoginPage() {
         sx={{ mb: 2 }}
       />
 
-      {/* 🔒 Password */}
       <TextField
         label="Contraseña"
         placeholder="••••••••"
@@ -137,7 +131,6 @@ export default function LoginPage() {
         sx={{ mb: 2 }}
       />
 
-      {/* ✅ Botón */}
       <Button
         type="submit"
         variant="contained"
@@ -150,13 +143,8 @@ export default function LoginPage() {
 
       <Divider sx={{ my: 2.5 }} />
 
-      {/* 🧪 Credenciales mock (solo para desarrollo) */}
       <Typography variant="caption" color="text.secondary">
-        🧪 Modo Mock (desarrollo):
-        <br />
-        • admin / admin123
-        <br />
-        • organizador / org123
+        🔐 Acceso protegido con JWT
       </Typography>
     </Box>
   );
