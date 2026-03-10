@@ -74,7 +74,7 @@ export default function MeetingCard({
         <Divider sx={{ my: 1.4 }} />
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems="flex-start">
-          <Tooltip title="Asistencias">
+         {/*<Tooltip title="Asistencias">
             <Stack direction="row" spacing={0.8} alignItems="center">
               <GroupsIcon fontSize="small" />
               <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -84,7 +84,7 @@ export default function MeetingCard({
                 asistentes
               </Typography>
             </Stack>
-          </Tooltip>
+          </Tooltip>*/}
 
           <Tooltip title="Evidencias">
             <Stack direction="row" spacing={0.8} alignItems="center">
