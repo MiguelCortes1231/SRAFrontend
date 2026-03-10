@@ -1,5 +1,5 @@
 // src/pages/meetings/MeetingDetailPage.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Alert,
@@ -42,6 +42,9 @@ export default function MeetingDetailPage() {
   const [confirmFinalOpen, setConfirmFinalOpen] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
 
+  // 👁️ Referencia al botón de preview para hacer scroll suave
+  const previewButtonRef = useRef<HTMLButtonElement | null>(null);
+
   async function load() {
     if (!meetingId) return;
 
@@ -79,6 +82,7 @@ export default function MeetingDetailPage() {
 
       {(isCompleted || isCancelled) && meeting ? (
         <Button
+          ref={previewButtonRef}
           variant="contained"
           startIcon={<VisibilityIcon />}
           onClick={() => navigate(`/meetings/${meeting.id}/preview`)}
@@ -177,6 +181,14 @@ export default function MeetingDetailPage() {
       setConfirmFinalOpen(false);
 
       toast.success("✅ Agenda finalizada correctamente");
+
+      // 🧠 Esperamos un poquito para que React pinte el botón de preview
+      window.setTimeout(() => {
+        previewButtonRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 250);
     } catch (err: any) {
       toast.error(err?.message || "❌ No se pudo finalizar la agenda");
     } finally {
