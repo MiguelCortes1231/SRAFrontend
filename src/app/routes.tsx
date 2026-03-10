@@ -24,6 +24,7 @@ import MeetingCreatePage from "../pages/meetings/MeetingCreatePage";
 import MeetingDetailPage from "../pages/meetings/MeetingDetailPage";
 import ScanCredencialPage from "../pages/scan/ScanCredencialPage";
 import MeetingEditPage from "../pages/meetings/MeetingEditPage";
+import MeetingPreviewPage from "../pages/meetings/MeetingPreviewPage";
 
 export default function AppRoutes() {
   return (
@@ -52,6 +53,7 @@ export default function AppRoutes() {
         <Route path="/meetings/new" element={<MeetingCreatePage />} />
         <Route path="/meetings/:meetingId" element={<MeetingDetailPage />} />
         <Route path="/meetings/:meetingId/edit" element={<MeetingEditPage />} />
+        <Route path="/meetings/:meetingId/preview" element={<MeetingPreviewPage />} />
 
 
       </Route>

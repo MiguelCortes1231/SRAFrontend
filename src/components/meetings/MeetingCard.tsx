@@ -17,6 +17,7 @@ import ImageIcon from "@mui/icons-material/Image";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import type { Meeting } from "../../models/meeting";
 import { formatDateShort } from "../../utils/format";
@@ -27,9 +28,20 @@ type Props = {
   onOpen: (id: string) => void;
   onEdit: (id: string) => void;
   onCancel?: (id: string) => void;
+  onPreview?: (id: string) => void;
 };
 
-export default function MeetingCard({ meeting, onOpen, onEdit, onCancel }: Props) {
+export default function MeetingCard({
+  meeting,
+  onOpen,
+  onEdit,
+  onCancel,
+  onPreview,
+}: Props) {
+  const isCancelled = meeting.status === "OBSERVADA";
+  const isCompleted = meeting.status === "COMPLETADA";
+  const canPreview = isCancelled || isCompleted;
+
   return (
     <Card
       sx={{
@@ -37,9 +49,10 @@ export default function MeetingCard({ meeting, onOpen, onEdit, onCancel }: Props
         border: "1px solid rgba(0,0,0,0.06)",
         "&:hover": { boxShadow: "0 18px 55px rgba(0,0,0,0.10)" },
         transition: "box-shadow 150ms ease",
+        height: "100%",
       }}
     >
-      <CardContent>
+      <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -88,41 +101,75 @@ export default function MeetingCard({ meeting, onOpen, onEdit, onCancel }: Props
           <Box sx={{ flex: 1 }} />
         </Stack>
 
+        <Box sx={{ flex: 1 }} />
+
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1}
           sx={{ mt: 2 }}
           justifyContent="flex-end"
         >
-          {onCancel ? (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<CancelIcon />}
-              onClick={() => onCancel(meeting.id)}
-              sx={{ borderRadius: 2 }}
-            >
-              Cancelar
-            </Button>
-          ) : null}
+          {/* 🚫 Cancelada: solo preview */}
+          {isCancelled ? (
+            <>
+              {canPreview && onPreview ? (
+                <Button
+                  variant="contained"
+                  startIcon={<VisibilityIcon />}
+                  onClick={() => onPreview(meeting.id)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Previsualizar 👁️
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {/* ✅ Completada: sin cancelar y sin editar, pero sí detalle + preview */}
+              {!isCompleted && onCancel ? (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<CancelIcon />}
+                  onClick={() => onCancel(meeting.id)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancelar
+                </Button>
+              ) : null}
 
-          <Button
-            variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={() => onEdit(meeting.id)}
-            sx={{ borderRadius: 2 }}
-          >
-            Editar
-          </Button>
+              {!isCompleted ? (
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={() => onEdit(meeting.id)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Editar
+                </Button>
+              ) : null}
 
-          <Button
-            variant="contained"
-            endIcon={<ArrowForwardIcon />}
-            onClick={() => onOpen(meeting.id)}
-            sx={{ borderRadius: 2 }}
-          >
-            Ver detalle
-          </Button>
+              {canPreview && onPreview ? (
+                <Button
+                  variant="outlined"
+                  startIcon={<VisibilityIcon />}
+                  onClick={() => onPreview(meeting.id)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Previsualizar
+                </Button>
+              ) : null}
+
+              <Button
+                variant="contained"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => onOpen(meeting.id)}
+                sx={{ borderRadius: 2 }}
+              >
+                Ver detalle
+              </Button>
+            </>
+          )}
         </Stack>
       </CardContent>
     </Card>

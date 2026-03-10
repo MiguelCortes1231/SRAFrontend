@@ -128,6 +128,7 @@ export default function MeetingsListPage() {
   const handleOpen = (id: string) => navigate(`/meetings/${id}`);
   const handleEdit = (id: string) => navigate(`/meetings/${id}/edit`);
   const handleAskCancel = (id: string) => setCancelId(id);
+  const handlePreview = (id: string) => navigate(`/meetings/${id}/preview`);
 
   const handleResetFilters = () => {
     setQuery("");
@@ -158,7 +159,7 @@ export default function MeetingsListPage() {
     <Box>
       <PageHeader
         title="Reuniones"
-        subtitle="Consulta, filtra, edita y cancela agendas 📋"
+        subtitle="Consulta, filtra, edita, cancela o previsualiza agendas 📋"
         actions={actions}
       />
 
@@ -168,14 +169,7 @@ export default function MeetingsListPage() {
         </Typography>
       ) : null}
 
-      <Grid
-  container
-  spacing={2}
-  sx={{
-    mb: 2,
-    alignItems: "stretch", // 🔥 fuerza misma altura
-  }}
->
+      <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} md={4}>
           <TextField
             label="Buscar"
@@ -196,6 +190,7 @@ export default function MeetingsListPage() {
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
             <MenuItem value="ALL">Todos</MenuItem>
+            <MenuItem value="BORRADOR">Borrador ✍️</MenuItem>
             <MenuItem value="EN_PROCESO">En proceso 🧭</MenuItem>
             <MenuItem value="COMPLETADA">Completada ✅</MenuItem>
             <MenuItem value="OBSERVADA">Cancelada 🚫</MenuItem>
@@ -271,6 +266,7 @@ export default function MeetingsListPage() {
                       onOpen={handleOpen}
                       onEdit={handleEdit}
                       onCancel={handleAskCancel}
+                      onPreview={handlePreview}
                     />
                   </Grid>
                 ))}

@@ -14,6 +14,7 @@ import {
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { toast } from "react-toastify";
 
@@ -61,15 +62,32 @@ export default function MeetingDetailPage() {
     void load();
   }, [meetingId]);
 
+  const isCompleted = meeting?.status === "COMPLETADA";
+  const isCancelled = meeting?.status === "OBSERVADA";
+  const disableFinalize = isCompleted || isCancelled;
+
   const actions = (
-    <Button
-      variant="outlined"
-      startIcon={<ArrowBackIcon />}
-      onClick={() => navigate("/meetings")}
-      sx={{ borderRadius: 2 }}
-    >
-      Volver a reuniones
-    </Button>
+    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+      <Button
+        variant="outlined"
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate("/meetings")}
+        sx={{ borderRadius: 2 }}
+      >
+        Volver a reuniones
+      </Button>
+
+      {(isCompleted || isCancelled) && meeting ? (
+        <Button
+          variant="contained"
+          startIcon={<VisibilityIcon />}
+          onClick={() => navigate(`/meetings/${meeting.id}/preview`)}
+          sx={{ borderRadius: 2 }}
+        >
+          Previsualizar 👁️
+        </Button>
+      ) : null}
+    </Stack>
   );
 
   const summary = useMemo(() => {
@@ -130,11 +148,23 @@ export default function MeetingDetailPage() {
 
             <Divider sx={{ my: 1 }} />
             <MeetingStepper flow={meeting.flow} />
+
+            {isCompleted ? (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                Esta agenda ya está completada ✅
+              </Alert>
+            ) : null}
+
+            {isCancelled ? (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                Esta agenda fue cancelada 🚫
+              </Alert>
+            ) : null}
           </Stack>
         </CardContent>
       </Card>
     );
-  }, [meeting]);
+  }, [meeting, isCompleted, isCancelled]);
 
   const handleFinalizePhase6 = async () => {
     if (!meeting) return;
@@ -178,7 +208,6 @@ export default function MeetingDetailPage() {
       {summary}
 
       <Stack spacing={2} sx={{ mt: 2 }}>
-        {/* 📸 Fase 2 */}
         <EvidenceUploadCard
           meeting={meeting}
           phase={2}
@@ -187,13 +216,10 @@ export default function MeetingDetailPage() {
           onUpdated={(m) => setMeeting(m)}
         />
 
-        {/* 👥 Fase 3 */}
         <AttendancePhaseSection agendaId={meeting.id} />
 
-        {/* 📸 Fase 4 */}
         <PhotoGroupCapture meeting={meeting} onUpdated={(m) => setMeeting(m)} />
 
-        {/* 📸 Fase 5 */}
         <EvidenceUploadCard
           meeting={meeting}
           phase={5}
@@ -202,16 +228,26 @@ export default function MeetingDetailPage() {
           onUpdated={(m) => setMeeting(m)}
         />
 
-        {/* 🧪 Fase 6 */}
         <EvidenceComparePanel meeting={meeting} />
 
-        {/* ✅ Cierre */}
         <Card>
           <CardContent>
             <Typography sx={{ fontWeight: 900 }}>Cierre / Auditoría ✅</Typography>
             <Typography variant="body2" color="text.secondary">
               Cuando estés seguro de la comparación y evidencias, puedes finalizar la agenda.
             </Typography>
+
+            {isCompleted ? (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                Esta agenda ya se encuentra completada ✅
+              </Alert>
+            ) : null}
+
+            {isCancelled ? (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                Esta agenda fue cancelada y ya no puede finalizarse 🚫
+              </Alert>
+            ) : null}
 
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -222,9 +258,14 @@ export default function MeetingDetailPage() {
               <Button
                 variant="outlined"
                 onClick={() => setConfirmFinalOpen(true)}
+                disabled={disableFinalize}
                 sx={{ borderRadius: 2 }}
               >
-                Marcar Fase 6 como completada ✅
+                {isCompleted
+                  ? "Agenda ya completada ✅"
+                  : isCancelled
+                  ? "Agenda cancelada 🚫"
+                  : "Marcar Fase 6 como completada ✅"}
               </Button>
             </Stack>
           </CardContent>
