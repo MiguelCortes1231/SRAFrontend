@@ -46,6 +46,7 @@ import {
   isValidPostalCode,
   normalizeCurp,
 } from "../../utils/validators";
+import OcrScannerOverlay from "../ui/OcrScannerOverlay";
 
 type Props = {
   agendaId: string;
@@ -317,11 +318,14 @@ export default function AttendancePersonForm({
   };
 
   return (
+  <>
     <Card>
-      <CardContent  sx={{
-        px: { xs: 2, sm: 3, md: 4 },
-        py: 3,
-      }}>
+      <CardContent
+        sx={{
+          px: { xs: 2, sm: 3, md: 4 },
+          py: 3,
+        }}
+      >
         <Stack spacing={2}>
           <Stack direction="row" spacing={1} alignItems="center">
             <BadgeIcon color="primary" />
@@ -639,5 +643,12 @@ export default function AttendancePersonForm({
         </Stack>
       </CardContent>
     </Card>
+
+    <OcrScannerOverlay
+      open={ocrLoading}
+      title="Escaneando INE..."
+      subtitle="Leyendo datos y separando nombres con OCR 🧠📇"
+    />
+  </>
   );
 }
