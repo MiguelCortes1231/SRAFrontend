@@ -19,7 +19,7 @@
 import axios from "axios";
 import { ddmmyyyyToIso } from "../utils/validators";
 
-const OCR_BASE_URL = import.meta.env.VITE_OCR_BASE_URL || "http://31.220.59.32:8888";
+const OCR_BASE_URL = import.meta.env.VITE_OCR_BASE_URL || "https://brmstudio.com.mx/ocr";
 
 export type OcrRawResponse = {
   anio_registro?: string;
