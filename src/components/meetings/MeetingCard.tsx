@@ -1,15 +1,4 @@
 // src/components/meetings/MeetingCard.tsx
-/**
- * 🧾 MeetingCard
- * -----------------------------------------
- * Card elegante para mostrar una reunión:
- * - Tipo / Sede / Fecha
- * - Municipio / Sección
- * - Estado (Chip)
- * - Métricas (adultos/menores/evidencias)
- * - Acciones (ver / eliminar)
- */
-
 import React from "react";
 import {
   Card,
@@ -27,6 +16,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import ImageIcon from "@mui/icons-material/Image";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import EditIcon from "@mui/icons-material/Edit";
 
 import type { Meeting } from "../../models/meeting";
 import { formatDateShort } from "../../utils/format";
@@ -35,10 +25,11 @@ import MeetingStatusChip from "./MeetingStatusChip";
 type Props = {
   meeting: Meeting;
   onOpen: (id: string) => void;
+  onEdit: (id: string) => void;
   onDelete?: (id: string) => void;
 };
 
-export default function MeetingCard({ meeting, onOpen, onDelete }: Props) {
+export default function MeetingCard({ meeting, onOpen, onEdit, onDelete }: Props) {
   return (
     <Card
       sx={{
@@ -69,9 +60,8 @@ export default function MeetingCard({ meeting, onOpen, onDelete }: Props) {
 
         <Divider sx={{ my: 1.4 }} />
 
-        {/* 📊 Métricas */}
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems="flex-start">
-          <Tooltip title="Asistencias (adultos + menores)">
+          <Tooltip title="Asistencias">
             <Stack direction="row" spacing={0.8} alignItems="center">
               <GroupsIcon fontSize="small" />
               <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -83,7 +73,7 @@ export default function MeetingCard({ meeting, onOpen, onDelete }: Props) {
             </Stack>
           </Tooltip>
 
-          <Tooltip title="Evidencias (YT/FB inicial/final + foto grupal)">
+          <Tooltip title="Evidencias">
             <Stack direction="row" spacing={0.8} alignItems="center">
               <ImageIcon fontSize="small" />
               <Typography variant="body2" sx={{ fontWeight: 800 }}>
@@ -98,7 +88,6 @@ export default function MeetingCard({ meeting, onOpen, onDelete }: Props) {
           <Box sx={{ flex: 1 }} />
         </Stack>
 
-        {/* 🎛️ Acciones */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1}
@@ -116,6 +105,15 @@ export default function MeetingCard({ meeting, onOpen, onDelete }: Props) {
               Eliminar
             </Button>
           ) : null}
+
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => onEdit(meeting.id)}
+            sx={{ borderRadius: 2 }}
+          >
+            Editar
+          </Button>
 
           <Button
             variant="contained"

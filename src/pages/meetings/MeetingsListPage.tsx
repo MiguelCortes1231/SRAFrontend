@@ -1,18 +1,11 @@
 // src/pages/meetings/MeetingsListPage.tsx
-/**
- * 📋 MeetingsListPage
- * -----------------------------------------
- * - Lista de reuniones con filtros pro 🔎
- * - Cards elegantes 🧾
- * - Eliminar con confirmación 🗑️✅
- */
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
   Grid,
+  Pagination,
   Stack,
   TextField,
   Typography,
@@ -22,6 +15,8 @@ import {
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import SearchIcon from "@mui/icons-material/Search";
 import ListAltIcon from "@mui/icons-material/ListAlt";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
 import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
@@ -29,10 +24,24 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import MeetingCard from "../../components/meetings/MeetingCard";
 
 import type { Meeting, MeetingStatus, MeetingType } from "../../models/meeting";
-import { deleteMeeting, listMeetings } from "../../services/meetings.service";
+import {
+  deleteMeeting,
+  listMeetings,
+  listMeetingsByDate,
+} from "../../services/meetings.service";
 
 type StatusFilter = "ALL" | MeetingStatus;
 type TypeFilter = "ALL" | MeetingType;
+
+const PAGE_SIZE = 8;
+
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export default function MeetingsListPage() {
   const navigate = useNavigate();
@@ -41,12 +50,16 @@ export default function MeetingsListPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 🔎 Filtros
+  // 🔎 filtros
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
+  const [dateFilter, setDateFilter] = useState("");
 
-  // 🗑️ Delete dialog
+  // 📄 paginación
+  const [page, setPage] = useState(1);
+
+  // 🗑️ delete
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -54,7 +67,11 @@ export default function MeetingsListPage() {
     try {
       setLoading(true);
       setErrorMsg(null);
-      const data = await listMeetings();
+
+      const data = dateFilter
+        ? await listMeetingsByDate(dateFilter)
+        : await listMeetings();
+
       setMeetings(data);
     } catch (err: any) {
       setErrorMsg(err?.message || "No se pudieron cargar las reuniones ❌");
@@ -64,10 +81,10 @@ export default function MeetingsListPage() {
   }
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void load();
+  }, [dateFilter]);
 
+  // 🔎 filtro local adicional
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -94,6 +111,18 @@ export default function MeetingsListPage() {
     });
   }, [meetings, query, statusFilter, typeFilter]);
 
+  // 🔢 paginación
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  const paginatedMeetings = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, typeFilter, dateFilter]);
+
   const actions = (
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1} width={{ xs: "100%", sm: "auto" }}>
       <Button
@@ -108,11 +137,20 @@ export default function MeetingsListPage() {
   );
 
   const handleOpen = (id: string) => navigate(`/meetings/${id}`);
-
+  const handleEdit = (id: string) => navigate(`/meetings/${id}/edit`);
   const handleAskDelete = (id: string) => setDeleteId(id);
+
+  const handleResetFilters = () => {
+    setQuery("");
+    setStatusFilter("ALL");
+    setTypeFilter("ALL");
+    setDateFilter("");
+    setPage(1);
+  };
 
   const handleConfirmDelete = async () => {
     if (!deleteId) return;
+
     try {
       setDeleting(true);
       await deleteMeeting(deleteId);
@@ -129,20 +167,19 @@ export default function MeetingsListPage() {
     <Box>
       <PageHeader
         title="Reuniones"
-        subtitle="Administra reuniones, evidencias, asistencias y su flujo por fases 🧭"
+        subtitle="Consulta, filtra, edita y navega tus reuniones 📋"
         actions={actions}
       />
 
-      {/* 🧯 Error */}
       {errorMsg ? (
         <Typography color="error" sx={{ mb: 2, fontWeight: 800 }}>
           {errorMsg}
         </Typography>
       ) : null}
 
-      {/* 🔎 Filtros */}
+      {/* 🔎 filtros */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <TextField
             label="Buscar"
             placeholder="Sede, municipio, sección, organizador..."
@@ -154,7 +191,7 @@ export default function MeetingsListPage() {
           />
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
           <TextField
             select
             label="Estatus"
@@ -169,7 +206,7 @@ export default function MeetingsListPage() {
           </TextField>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2}>
           <TextField
             select
             label="Tipo"
@@ -181,52 +218,92 @@ export default function MeetingsListPage() {
             <MenuItem value="EVENTO">Evento</MenuItem>
           </TextField>
         </Grid>
+
+        <Grid item xs={12} sm={6} md={2}>
+          <TextField
+            label="Fecha agenda"
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            InputProps={{
+              startAdornment: <CalendarMonthIcon sx={{ mr: 1, color: "text.secondary" }} />,
+            }}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={2}>
+          <Button
+            variant="outlined"
+            startIcon={<RestartAltIcon />}
+            onClick={handleResetFilters}
+            fullWidth
+            sx={{ height: "40px", borderRadius: 2 }}
+          >
+            Reiniciar
+          </Button>
+        </Grid>
       </Grid>
 
-      {/* ⏳ Loading */}
       {loading ? <Typography color="text.secondary">Cargando... ⏳</Typography> : null}
 
-      {/* 🫙 Empty */}
       {!loading && meetings.length === 0 ? (
         <EmptyState
           title="Aún no hay reuniones registradas"
-          description="Crea tu primera reunión para iniciar el flujo por fases (1..6) 🧭"
+          description="Crea tu primera reunión para iniciar el flujo 🧭"
           icon={<ListAltIcon />}
           actionLabel="Crear reunión ➕"
           onAction={() => navigate("/meetings/new")}
         />
       ) : null}
 
-      {/* 🧾 Lista */}
       {!loading && meetings.length > 0 ? (
         <>
           {filtered.length === 0 ? (
             <EmptyState
               title="No hay resultados con esos filtros"
-              description="Prueba otro texto o cambia estatus/tipo 🔎"
+              description="Prueba otro texto o cambia fecha/estatus/tipo 🔎"
               icon={<SearchIcon />}
             />
           ) : (
-            <Grid container spacing={2}>
-              {filtered.map((m) => (
-                <Grid item xs={12} md={6} xl={4} key={m.id}>
-                  <MeetingCard
-                    meeting={m}
-                    onOpen={handleOpen}
-                    onDelete={handleAskDelete}
-                  />
-                </Grid>
-              ))}
-            </Grid>
+            <>
+              <Grid container spacing={2}>
+                {paginatedMeetings.map((m) => (
+                  <Grid item xs={12} md={6} xl={4} key={m.id}>
+                    <MeetingCard
+                      meeting={m}
+                      onOpen={handleOpen}
+                      onEdit={handleEdit}
+                      onDelete={handleAskDelete}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* 📄 paginación */}
+              <Stack alignItems="center" sx={{ mt: 3 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(_, value) => setPage(value)}
+                  color="primary"
+                  shape="rounded"
+                  showFirstButton
+                  showLastButton
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  Mostrando {paginatedMeetings.length} de {filtered.length} registros
+                </Typography>
+              </Stack>
+            </>
           )}
         </>
       ) : null}
 
-      {/* ✅ Confirmación delete */}
       <ConfirmDialog
         open={Boolean(deleteId)}
         title="Eliminar reunión"
-        description="Esta acción eliminará la reunión del mock DB (local). ¿Deseas continuar? 🗑️"
+        description="Esta acción eliminará la reunión. ¿Deseas continuar? 🗑️"
         confirmText={deleting ? "Eliminando... ⏳" : "Sí, eliminar 🗑️"}
         cancelText="Cancelar"
         onConfirm={handleConfirmDelete}

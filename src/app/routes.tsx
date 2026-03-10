@@ -23,6 +23,7 @@ import MeetingsListPage from "../pages/meetings/MeetingsListPage";
 import MeetingCreatePage from "../pages/meetings/MeetingCreatePage";
 import MeetingDetailPage from "../pages/meetings/MeetingDetailPage";
 import ScanCredencialPage from "../pages/scan/ScanCredencialPage";
+import MeetingEditPage from "../pages/meetings/MeetingEditPage";
 
 export default function AppRoutes() {
   return (
@@ -50,9 +51,9 @@ export default function AppRoutes() {
         <Route path="/meetings" element={<MeetingsListPage />} />
         <Route path="/meetings/new" element={<MeetingCreatePage />} />
         <Route path="/meetings/:meetingId" element={<MeetingDetailPage />} />
+        <Route path="/meetings/:meetingId/edit" element={<MeetingEditPage />} />
 
-        {/* 🪪 Escaneo INE/IFE (futuro) */}
-        <Route path="/scan" element={<ScanCredencialPage />} />
+
       </Route>
 
       {/* 🧯 404 */}

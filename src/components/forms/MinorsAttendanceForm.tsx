@@ -31,7 +31,7 @@ import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 
 import type { Meeting } from "../../models/meeting";
 import { addMinorAttendance } from "../../services/meetings.service";
-import { isAgeAllowed, isValidCurp, normalizeCurp } from "../../utils/validators";
+import {  isValidCurp, normalizeCurp } from "../../utils/validators";
 
 type Props = {
   meeting: Meeting;
@@ -55,7 +55,6 @@ export default function MinorsAttendanceForm({ meeting, onUpdated }: Props) {
     const list: string[] = [];
 
     if (!isValidCurp(curpNorm)) list.push("CURP inválida ❌");
-    if (!isAgeAllowed(edad, 17)) list.push("Edad no permitida (mínimo 17) ⚠️");
 
     if (nombre.trim().length < 2) list.push("Nombre requerido ✍️");
     if (primerApellido.trim().length < 2) list.push("Primer apellido requerido ✍️");

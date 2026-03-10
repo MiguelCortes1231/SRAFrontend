@@ -47,7 +47,6 @@ export default function MainLayout() {
     () => [
       { label: "Dashboard", to: "/dashboard", icon: <DashboardIcon /> },
       { label: "Reuniones", to: "/meetings", icon: <EventNoteIcon /> },
-      { label: "Escaneo INE/IFE (Futuro)", to: "/scan", icon: <VerifiedUserIcon /> },
     ],
     []
   );

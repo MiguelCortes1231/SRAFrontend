@@ -19,14 +19,13 @@ import QrCode2Icon from "@mui/icons-material/QrCode2";
 import PageHeader from "../../components/ui/PageHeader";
 import MeetingStepper from "../../components/meetings/MeetingStepper";
 import EvidenceUploadCard from "../../components/evidence/EvidenceUploadCard";
-import AdultsAttendanceForm from "../../components/forms/AdultsAttendanceForm";
-import MinorsAttendanceForm from "../../components/forms/MinorsAttendanceForm";
 import PhotoGroupCapture from "../../components/evidence/PhotoGroupCapture";
 import EvidenceComparePanel from "../../components/evidence/EvidenceComparePanel";
 
 import type { Meeting } from "../../models/meeting";
 import { getMeeting, setPhaseStatus } from "../../services/meetings.service";
 import { formatDateShort } from "../../utils/format";
+import AttendancePhaseSection from "../../components/attendance/AttendancePhaseSection";
 
 export default function MeetingDetailPage() {
   const navigate = useNavigate();
@@ -166,8 +165,7 @@ export default function MeetingDetailPage() {
         />
 
         {/* 👥 Fase 3 */}
-        <AdultsAttendanceForm meeting={meeting} onUpdated={(m) => setMeeting(m)} />
-        <MinorsAttendanceForm meeting={meeting} onUpdated={(m) => setMeeting(m)} />
+        <AttendancePhaseSection agendaId={meeting.id} />
 
         {/* 📸 Fase 4 */}
         <PhotoGroupCapture meeting={meeting} onUpdated={(m) => setMeeting(m)} />

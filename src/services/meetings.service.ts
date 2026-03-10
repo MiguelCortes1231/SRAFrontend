@@ -7,6 +7,7 @@
  * - listMeetingsByDate()
  * - getMeeting()
  * - createMeeting()
+ * - updateMeeting()
  *
  * 🧪 MOCK temporal:
  * - setPhaseStatus()
@@ -60,6 +61,12 @@ type StoreAgendaResponse = {
     created_at: string;
     IdAgenda: number;
   };
+};
+
+type UpdateAgendaResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
 };
 
 type AgendaApiRow = {
@@ -298,7 +305,6 @@ export async function listMeetingsByDate(dateISO: string): Promise<Meeting[]> {
   return meetings.sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
 }
 
-/** ✅ Ahora sí real por IdAgenda */
 export async function getMeeting(meetingId: string): Promise<Meeting> {
   const res = await http.get<GetAgendaResponse>(`/getAgenda/${meetingId}`);
   const row = res.data?.data;
@@ -362,6 +368,28 @@ export async function createMeeting(core: MeetingCore): Promise<Meeting> {
 
   upsertMeetingToMock(mapped);
   return mapped;
+}
+
+/** ✏️ Editar agenda real */
+export async function updateMeeting(meetingId: string, core: MeetingCore): Promise<Meeting> {
+  const payload = {
+    IdReunion: meetingTypeToIdReunion(core.type),
+    FechaAgenda: core.dateISO,
+    Sede: core.sede,
+    Organizador: core.organizer.name,
+    Enlace: core.enlace.name,
+    IdSeccion: Number(core.seccion),
+    Direccion: core.address,
+    Latitud: Number(core.location.lat),
+    Longitud: Number(core.location.lng),
+  };
+
+  await http.put<UpdateAgendaResponse>(`/updateAgenda/${meetingId}`, payload);
+
+  // ✅ después de editar, traemos la agenda real actualizada
+  const updated = await getMeeting(meetingId);
+  upsertMeetingToMock(updated);
+  return updated;
 }
 
 /* =========================================================

@@ -1,35 +1,47 @@
 // src/models/attendance.ts
 /**
- * 🧑‍🤝‍🧑 Modelos: Asistencias
+ * 🧾 Modelos de asistencia (FASE 3)
  * -----------------------------------------
- * Fase 3:
- * - Adultos (form/herramienta)
- * - Menores (>=17) con validación CURP + edad
+ * Soporta:
+ * - menores de 17 años 👦
+ * - ciudadanos / ciudadanas 👨‍🦱👩‍🦱
+ * - OCR INE
+ * - edición / eliminación
  */
 
-export type AttendanceAdult = {
-  id: string;
-  meetingId: string;
+export type AttendancePersonType = "MENOR_17" | "CIUDADANO";
+export type AttendanceCaptureMode = "MANUAL" | "OCR";
 
-  // 👤 En adultos suele ser mínimo (puede crecer)
-  fullName: string;
-  phone?: string;
-
-  createdAtISO: string;
+export type AttendancePersonPayload = {
+  ClaveElector: string;
+  CURP: string;
+  PrimerApellido: string;
+  SegundoApellido: string;
+  Nombre: string;
+  IdSeccion: number;
+  Sexo: "H" | "M";
+  FechaNacimiento: string; // YYYY-MM-DD
+  Domicilio: string;
+  Colonia: string;
+  CodigoPostal: string;
+  Telefono: string;
 };
 
-export type AttendanceMinor = {
-  id: string;
-  meetingId: string;
-
-  // ✅ Campos requeridos por tu especificación
-  curp: string;
-  nombre: string;
-  primerApellido: string;
-  segundoApellido: string;
-  domicilio: string;
-  telefono: string;
-  edad: number;
-
-  createdAtISO: string;
+export type AttendancePersonRow = {
+  IdListado: number;
+  IdAgenda: number;
+  ClaveElector: string;
+  CURP: string;
+  PrimerApellido: string;
+  SegundoApellido: string;
+  Nombre: string;
+  IdSeccion: number;
+  Sexo: "H" | "M";
+  FechaNacimiento: string;
+  Domicilio: string;
+  Colonia: string;
+  CodigoPostal: string | number;
+  Telefono: string;
+  EsMenor: number; // 0 o 1
+  Llave: string;
 };
