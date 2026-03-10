@@ -4,9 +4,7 @@
  * -----------------------------------------
  * ✅ Vista bonita por fases
  * ✅ PDF profesional sin cortes feos
- * ✅ Secciones separadas para PDF
- * ✅ Fase 3 dividida en bloques pequeños
- * ✅ Mapa, QR, evidencias e info completa
+ * ✅ QR ahora apunta a la URL de preview
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +16,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   Grid,
   Stack,
   Typography,
@@ -45,6 +42,7 @@ import type { AttendancePersonRow } from "../../models/attendance";
 import { getMeeting } from "../../services/meetings.service";
 import { listAttendancePersons } from "../../services/attendance.service";
 import { formatDateShort } from "../../utils/format";
+import { buildMeetingPreviewUrl } from "../../utils/qr";
 
 const ATTENDANCE_CHUNK_SIZE = 4;
 
@@ -200,13 +198,12 @@ export default function MeetingPreviewPage() {
     [attendance]
   );
 
-  /**
-   * 📄 Generador PDF bonito por secciones
-   * -----------------------------------------
-   * Ya no captura todo como una sola imagen gigante.
-   * Captura cada sección marcada con data-pdf-section,
-   * y las agrega ordenadamente al PDF evitando cortes feos.
-   */
+  // 🔳 URL real que irá dentro del QR
+  const previewUrl = useMemo(() => {
+    if (!meeting) return "";
+    return buildMeetingPreviewUrl(meeting.id);
+  }, [meeting]);
+
   const handleDownloadPdf = async () => {
     if (!reportRef.current || !meeting) return;
 
@@ -242,18 +239,15 @@ export default function MeetingPreviewPage() {
         const imgWidth = usableWidth;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        // ✅ Si no cabe en la página actual, mandamos la sección completa a la siguiente
         if (!isFirstPage && cursorY + imgHeight > pageHeight - marginY) {
           pdf.addPage();
           cursorY = marginY;
         }
 
-        // ✅ Si una sección por sí sola es más alta que una hoja, la partimos con dignidad
         if (imgHeight <= usableHeight) {
           pdf.addImage(imgData, "PNG", marginX, cursorY, imgWidth, imgHeight);
           cursorY += imgHeight + 6;
         } else {
-          // troceo por páginas solo para esa sección
           let heightLeft = imgHeight;
           let position = 0;
 
@@ -337,9 +331,6 @@ export default function MeetingPreviewPage() {
       />
 
       <div ref={reportRef}>
-        {/* =========================================================
-         * ENCABEZADO EJECUTIVO
-         * ========================================================= */}
         <Card
           sx={{ borderRadius: 3, mb: 2 }}
           data-pdf-section="true"
@@ -384,7 +375,7 @@ export default function MeetingPreviewPage() {
 
               <Box
                 sx={{
-                  minWidth: { xs: "100%", md: 230 },
+                  minWidth: { xs: "100%", md: 280 },
                   p: 2,
                   borderRadius: 3,
                   bgcolor: "rgba(108,56,65,0.06)",
@@ -398,23 +389,23 @@ export default function MeetingPreviewPage() {
                 </Stack>
 
                 <Box sx={{ display: "flex", justifyContent: "center", mb: 1 }}>
-                  <QRCodeCanvas value={meeting.qr.qrValue} size={130} includeMargin />
+                  <QRCodeCanvas value={previewUrl} size={130} includeMargin />
                 </Box>
+
+              
 
                 <Typography
                   variant="caption"
-                  sx={{ display: "block", wordBreak: "break-all", fontFamily: "monospace" }}
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 1 }}
                 >
-                  {meeting.qr.qrValue}
+                  Llave: {meeting.qr.qrValue}
                 </Typography>
               </Box>
             </Stack>
           </CardContent>
         </Card>
 
-        {/* =========================================================
-         * FASE 1
-         * ========================================================= */}
         <PhaseBlock
           title="Fase 1 · Alta de reunión 🧾"
           subtitle="Datos principales, ubicación y coordenadas."
@@ -456,41 +447,6 @@ export default function MeetingPreviewPage() {
           </Grid>
         </PhaseBlock>
 
-        {/* =========================================================
-         * FASE 2
-         * ========================================================= */}
-        <PhaseBlock
-          title="Fase 2 · Evidencia Inicial Digital 📸"
-          subtitle="Estado inicial de redes sociales."
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="Facebook inicial 📘"
-                filePath={ev.initialFB?.imagePath}
-                value={ev.initialFB?.value}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="YouTube inicial ▶️"
-                filePath={ev.initialYT?.imagePath}
-                value={ev.initialYT?.value}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="WhatsApp inicial 💬"
-                filePath={ev.initialWA?.imagePath}
-                value={ev.initialWA?.value}
-              />
-            </Grid>
-          </Grid>
-        </PhaseBlock>
-
-        {/* =========================================================
-         * FASE 3 - BLOQUES PEQUEÑOS PARA EVITAR CORTES FEOS
-         * ========================================================= */}
         {attendanceChunks.length === 0 ? (
           <PhaseBlock
             title="Fase 3 · Lista de asistencia 👥"
@@ -572,9 +528,23 @@ export default function MeetingPreviewPage() {
           ))
         )}
 
-        {/* =========================================================
-         * FASE 4
-         * ========================================================= */}
+        <PhaseBlock
+          title="Fase 2 · Evidencia Inicial Digital 📸"
+          subtitle="Estado inicial de redes sociales."
+        >
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <EvidenceCard title="Facebook inicial 📘" filePath={ev.initialFB?.imagePath} value={ev.initialFB?.value} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <EvidenceCard title="YouTube inicial ▶️" filePath={ev.initialYT?.imagePath} value={ev.initialYT?.value} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <EvidenceCard title="WhatsApp inicial 💬" filePath={ev.initialWA?.imagePath} value={ev.initialWA?.value} />
+            </Grid>
+          </Grid>
+        </PhaseBlock>
+
         <PhaseBlock
           title="Fase 4 · Fotografía Grupal 📷"
           subtitle="Evidencia fotográfica del evento."
@@ -582,41 +552,23 @@ export default function MeetingPreviewPage() {
           <EvidenceCard title="Foto grupal 📸" filePath={ev.group?.imagePath} />
         </PhaseBlock>
 
-        {/* =========================================================
-         * FASE 5
-         * ========================================================= */}
         <PhaseBlock
           title="Fase 5 · Evidencia Final Digital 📸"
           subtitle="Estado final de redes sociales."
         >
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="Facebook final 📘"
-                filePath={ev.finalFB?.imagePath}
-                value={ev.finalFB?.value}
-              />
+              <EvidenceCard title="Facebook final 📘" filePath={ev.finalFB?.imagePath} value={ev.finalFB?.value} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="YouTube final ▶️"
-                filePath={ev.finalYT?.imagePath}
-                value={ev.finalYT?.value}
-              />
+              <EvidenceCard title="YouTube final ▶️" filePath={ev.finalYT?.imagePath} value={ev.finalYT?.value} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard
-                title="WhatsApp final 💬"
-                filePath={ev.finalWA?.imagePath}
-                value={ev.finalWA?.value}
-              />
+              <EvidenceCard title="WhatsApp final 💬" filePath={ev.finalWA?.imagePath} value={ev.finalWA?.value} />
             </Grid>
           </Grid>
         </PhaseBlock>
 
-        {/* =========================================================
-         * FASE 6
-         * ========================================================= */}
         <PhaseBlock
           title="Fase 6 · Comparación y cierre ✅"
           subtitle="Comparativa visual de evidencias y estado final de la agenda."
@@ -637,7 +589,8 @@ export default function MeetingPreviewPage() {
                   <strong>Estatus:</strong>{" "}
                   {isCompleted ? "Completada ✅" : isCancelled ? "Cancelada 🚫" : "En proceso 🧭"}
                 </Typography>
-                <Typography><strong>Llave / QR:</strong> {meeting.qr.qrValue}</Typography>
+                <Typography><strong>URL preview QR:</strong> {previewUrl}</Typography>
+                <Typography><strong>Llave interna:</strong> {meeting.qr.qrValue}</Typography>
                 <Typography><strong>Evidencias totales:</strong> {meeting.metrics.evidenceCount}</Typography>
                 <Typography><strong>Última actualización:</strong> {meeting.updatedAtISO}</Typography>
               </Box>
