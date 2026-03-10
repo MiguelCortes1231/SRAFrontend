@@ -5,14 +5,15 @@
  * ✅ REAL API:
  * - getProtectedImageBlobUrl()
  * - uploadPhase2()
+ * - uploadPhase4()
  *
  * 🧪 MOCK:
  * - addEvidence()
  * - removeEvidence()
  *
  * Nota:
- * Las imágenes protegidas NO deben usarse directo en <img src="...">
- * porque requieren Authorization header. Por eso aquí las pedimos como blob.
+ * Las imágenes protegidas NO deben ir directo en <img src="...">
+ * porque necesitan Authorization header. Por eso usamos blob.
  */
 
 import { http } from "./http";
@@ -22,7 +23,7 @@ import type { EvidencePlatform, EvidenceType } from "../models/evidence";
 // 🧪 mocks temporales
 import { mockAddEvidence, mockRemoveEvidence } from "../mocks/evidence.mock";
 
-/** 🔐 Obtiene una imagen protegida como blob URL */
+/** 🔐 Imagen protegida -> blob URL */
 export async function getProtectedImageBlobUrl(filePath: string): Promise<string> {
   const res = await http.get("/getImage", {
     params: { url: filePath },
@@ -61,12 +62,25 @@ export async function uploadPhase2(params: {
   }
 
   await http.post(`/fase2/${params.agendaId}`, fd, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    headers: { "Content-Type": "multipart/form-data" },
   });
 
-  // ✅ después de guardar, volvemos a pedir la agenda real actualizada
+  const { getMeeting } = await import("./meetings.service");
+  return getMeeting(String(params.agendaId));
+}
+
+/** 📸 Fase 4 real */
+export async function uploadPhase4(params: {
+  agendaId: string | number;
+  photoFile: File;
+}): Promise<Meeting> {
+  const fd = new FormData();
+  fd.append("FotoGrupal", params.photoFile);
+
+  await http.post(`/fase4/${params.agendaId}`, fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
   const { getMeeting } = await import("./meetings.service");
   return getMeeting(String(params.agendaId));
 }

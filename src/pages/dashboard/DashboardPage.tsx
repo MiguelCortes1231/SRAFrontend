@@ -2,36 +2,54 @@
 /**
  * 🏠 DashboardPage
  * -----------------------------------------
- * - KPIs (totales + estado)
- * - Próximas reuniones
- * - Calendario mensual con badges 📅
+ * ✅ Solo 3 KPIs:
+ * - Total de reuniones
+ * - En proceso
+ * - Completadas
+ *
+ * ✅ Todas las cards del mismo tamaño
+ * ✅ Próximas reuniones:
+ * - ordenadas por fecha más cercana al sistema
+ * - máximo 20
+ * - paginadas de 5
+ *
+ * ✅ Calendario:
+ * - reuniones del día paginadas de 5
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Button, Grid, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Grid,
+  Pagination,
+  Stack,
+  Typography,
+} from "@mui/material";
 
-// 🧩 UI reusable
 import PageHeader from "../../components/ui/PageHeader";
 import StatCard from "../../components/ui/StatCard";
 import EmptyState from "../../components/ui/EmptyState";
-
-// 📅 Calendar component
 import MeetingsCalendar from "../../components/calendar/MeetingsCalendar";
 
-// 🔁 Services
 import { listMeetings } from "../../services/meetings.service";
 
-// 🎯 Icons
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
 import type { Meeting } from "../../models/meeting";
 import { formatDateShort } from "../../utils/format";
+
+const UPCOMING_PAGE_SIZE = 5;
+const UPCOMING_MAX = 20;
+
+function toStartOfDay(dateStr: string) {
+  return new Date(`${dateStr}T00:00:00`);
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -40,7 +58,8 @@ export default function DashboardPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  /** 📥 Cargar reuniones */
+  const [upcomingPage, setUpcomingPage] = useState(1);
+
   useEffect(() => {
     let alive = true;
 
@@ -71,22 +90,70 @@ export default function DashboardPage() {
     const total = meetings.length;
     const enProceso = meetings.filter((m) => m.status === "EN_PROCESO").length;
     const completadas = meetings.filter((m) => m.status === "COMPLETADA").length;
-    const observadas = meetings.filter((m) => m.status === "OBSERVADA").length;
 
-    return { total, enProceso, completadas, observadas };
+    return { total, enProceso, completadas };
   }, [meetings]);
 
-  /** 📌 Próximas reuniones (top 5) */
+  /** 📅 Próximas reuniones:
+   * - primero reuniones de hoy o futuras
+   * - orden ascendente por fecha
+   * - máximo 20
+   * - si no hay futuras, usa las más cercanas pasadas
+   */
   const upcoming = useMemo(() => {
-    // Orden por fechaISO ascendente
-    const sorted = [...meetings].sort((a, b) =>
-      a.core.dateISO > b.core.dateISO ? 1 : -1
+    const today = new Date();
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
     );
-    return sorted.slice(0, 5);
+
+    const futureOrToday = meetings
+      .filter((m) => {
+        const d = toStartOfDay(m.core.dateISO);
+        return d.getTime() >= todayStart.getTime();
+      })
+      .sort((a, b) => {
+        const da = toStartOfDay(a.core.dateISO).getTime();
+        const db = toStartOfDay(b.core.dateISO).getTime();
+        return da - db;
+      });
+
+    const fallbackPastClosest = meetings
+      .filter((m) => {
+        const d = toStartOfDay(m.core.dateISO);
+        return d.getTime() < todayStart.getTime();
+      })
+      .sort((a, b) => {
+        const da = Math.abs(toStartOfDay(a.core.dateISO).getTime() - todayStart.getTime());
+        const db = Math.abs(toStartOfDay(b.core.dateISO).getTime() - todayStart.getTime());
+        return da - db;
+      });
+
+    const base = futureOrToday.length > 0 ? futureOrToday : fallbackPastClosest;
+    return base.slice(0, UPCOMING_MAX);
+  }, [meetings]);
+
+  const upcomingTotalPages = Math.max(
+    1,
+    Math.ceil(upcoming.length / UPCOMING_PAGE_SIZE)
+  );
+
+  const paginatedUpcoming = useMemo(() => {
+    const start = (upcomingPage - 1) * UPCOMING_PAGE_SIZE;
+    return upcoming.slice(start, start + UPCOMING_PAGE_SIZE);
+  }, [upcoming, upcomingPage]);
+
+  useEffect(() => {
+    setUpcomingPage(1);
   }, [meetings]);
 
   const actions = (
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} width={{ xs: "100%", sm: "auto" }}>
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      spacing={1}
+      width={{ xs: "100%", sm: "auto" }}
+    >
       <Button
         variant="contained"
         startIcon={<AddCircleIcon />}
@@ -111,53 +178,53 @@ export default function DashboardPage() {
     <Box>
       <PageHeader
         title="Dashboard"
-        subtitle="Control, evidencias, asistencias y trazabilidad en un solo lugar 🧭"
+        subtitle="Resumen general de reuniones, seguimiento y calendario 🧭"
         actions={actions}
       />
 
-      {/* 🧯 Error */}
       {errorMsg ? (
         <Typography color="error" sx={{ mb: 2, fontWeight: 700 }}>
           {errorMsg}
         </Typography>
       ) : null}
 
-      {/* ⏳ Loading simple */}
       {loading ? (
         <Typography color="text.secondary">Cargando datos... ⏳</Typography>
       ) : null}
 
-      {/* 📊 KPI Cards */}
+      {/* 📊 KPI Cards del mismo tamaño */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard label="Total de reuniones" value={kpis.total} icon={<EventNoteIcon />} />
+        <Grid item xs={12} md={4}>
+          <Box sx={{ height: "100%" }}>
+            <StatCard
+              label="Total de reuniones"
+              value={kpis.total}
+              icon={<EventNoteIcon />}
+              helperText="Todas las agendas registradas 📋"
+            />
+          </Box>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            label="En proceso"
-            value={kpis.enProceso}
-            icon={<PendingActionsIcon />}
-            helperText="Flujo por fases activo 🧭"
-          />
+        <Grid item xs={12} md={4}>
+          <Box sx={{ height: "100%" }}>
+            <StatCard
+              label="En proceso"
+              value={kpis.enProceso}
+              icon={<PendingActionsIcon />}
+              helperText="Reuniones con flujo activo 🧭"
+            />
+          </Box>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            label="Completadas"
-            value={kpis.completadas}
-            icon={<CheckCircleIcon />}
-            helperText="Listas para auditoría ✅"
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            label="Observadas"
-            value={kpis.observadas}
-            icon={<WarningAmberIcon />}
-            helperText="Revisar evidencias ⚠️"
-          />
+        <Grid item xs={12} md={4}>
+          <Box sx={{ height: "100%" }}>
+            <StatCard
+              label="Completadas"
+              value={kpis.completadas}
+              icon={<CheckCircleIcon />}
+              helperText="Reuniones finalizadas ✅"
+            />
+          </Box>
         </Grid>
       </Grid>
 
@@ -174,7 +241,7 @@ export default function DashboardPage() {
           {meetings.length === 0 ? (
             <EmptyState
               title="Aún no hay reuniones registradas"
-              description="Crea tu primera reunión para comenzar el flujo por fases (1..6) 🧭"
+              description="Crea tu primera reunión para comenzar el flujo por fases 🧭"
               icon={<CalendarMonthIcon />}
               actionLabel="Crear reunión ➕"
               onAction={() => navigate("/meetings/new")}
@@ -186,33 +253,62 @@ export default function DashboardPage() {
                 borderRadius: 3,
                 bgcolor: "background.paper",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+                height: "100%",
               }}
             >
               <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>
                 Próximas reuniones 📌
               </Typography>
 
-              {upcoming.map((m) => (
-                <Box
-                  key={m.id}
-                  onClick={() => navigate(`/meetings/${m.id}`)}
-                  sx={{
-                    p: 1.3,
-                    borderRadius: 2,
-                    border: "1px solid rgba(0,0,0,0.06)",
-                    mb: 1,
-                    cursor: "pointer",
-                    "&:hover": { bgcolor: "rgba(108,56,65,0.06)" },
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 800 }}>
-                    {m.core.type} · {m.core.sede}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatDateShort(m.core.dateISO)} · {m.core.municipio} · Sección {m.core.seccion}
-                  </Typography>
-                </Box>
-              ))}
+              {paginatedUpcoming.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No hay reuniones cercanas registradas 🫙
+                </Typography>
+              ) : (
+                <>
+                  {paginatedUpcoming.map((m) => (
+                    <Box
+                      key={m.id}
+                      onClick={() => navigate(`/meetings/${m.id}`)}
+                      sx={{
+                        p: 1.3,
+                        borderRadius: 2,
+                        border: "1px solid rgba(0,0,0,0.06)",
+                        mb: 1,
+                        cursor: "pointer",
+                        "&:hover": { bgcolor: "rgba(108,56,65,0.06)" },
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 800 }}>
+                        {m.core.type} · {m.core.sede}
+                      </Typography>
+
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDateShort(m.core.dateISO)} · {m.core.municipio} · Sección{" "}
+                        {m.core.seccion}
+                      </Typography>
+                    </Box>
+                  ))}
+
+                  {upcoming.length > UPCOMING_PAGE_SIZE ? (
+                    <Stack alignItems="center" sx={{ mt: 1.5 }}>
+                      <Pagination
+                        count={upcomingTotalPages}
+                        page={upcomingPage}
+                        onChange={(_, value) => setUpcomingPage(value)}
+                        size="small"
+                        color="primary"
+                        shape="rounded"
+                        showFirstButton
+                        showLastButton
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                        Mostrando {paginatedUpcoming.length} de {upcoming.length} reuniones cercanas
+                      </Typography>
+                    </Stack>
+                  ) : null}
+                </>
+              )}
             </Box>
           )}
         </Grid>

@@ -1,31 +1,38 @@
 // src/components/evidence/PhotoGroupCapture.tsx
 /**
- * 📸 PhotoGroupCapture (Fase 4)
+ * 📸 PhotoGroupCapture (FASE 4 REAL)
  * -----------------------------------------
- * - Cargar foto grupal (imagen)
- * - Guardar como evidencia tipo FOTO_GRUPAL
+ * ✅ Permite:
+ * - subir foto grupal
+ * - reemplazar foto grupal
+ * - previsualizar imagen protegida
+ * - guardar vía API real /fase4/{idagenda}
  *
- * Nota:
- * - En móviles puede abrir cámara automáticamente 📱
+ * 🔔 Con toasts
+ * 📱 Responsivo
  */
 
-import React, { useMemo, useRef, useState } from "react";
-import { Box, Button, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
+import React, { useMemo, useState } from "react";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  Typography,
+} from "@mui/material";
+
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import SaveIcon from "@mui/icons-material/Save";
+import GroupsIcon from "@mui/icons-material/Groups";
+
+import { toast } from "react-toastify";
 
 import type { Meeting } from "../../models/meeting";
-import { addEvidence, removeEvidence } from "../../services/evidence.service";
-
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+import ProtectedImage from "./ProtectedImage";
+import { uploadPhase4 } from "../../services/evidence.service";
 
 type Props = {
   meeting: Meeting;
@@ -33,42 +40,56 @@ type Props = {
 };
 
 export default function PhotoGroupCapture({ meeting, onUpdated }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
 
   const existing = useMemo(
     () => meeting.evidences.find((e) => e.type === "FOTO_GRUPAL"),
     [meeting.evidences]
   );
 
-  const handlePick = () => inputRef.current?.click();
+  const handleSelectFile = (file: File | null) => {
+    setPhotoFile(file);
 
-  const handleUpload = async (file: File) => {
-    try {
-      setLoading(true);
-      const base64 = await toBase64(file);
-      const updated = await addEvidence({
-        meetingId: meeting.id,
-        type: "FOTO_GRUPAL",
-        platform: "FISICA",
-        imageUrl: base64,
-      });
-      onUpdated(updated);
-    } catch (err: any) {
-      alert(err?.message || "No se pudo guardar foto grupal ❌");
-    } finally {
-      setLoading(false);
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+      setPhotoPreviewUrl(null);
+    }
+
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPhotoPreviewUrl(url);
+      toast.info("📸 Foto grupal lista para guardarse");
     }
   };
 
-  const handleRemove = async () => {
-    if (!existing) return;
+  const handleSave = async () => {
+    if (!photoFile) {
+      toast.warning("⚠️ Selecciona una foto grupal antes de guardar");
+      return;
+    }
+
     try {
       setLoading(true);
-      const updated = await removeEvidence(meeting.id, existing.id);
+
+      const updated = await uploadPhase4({
+        agendaId: meeting.id,
+        photoFile,
+      });
+
       onUpdated(updated);
+
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+
+      setPhotoFile(null);
+      setPhotoPreviewUrl(null);
+
+      toast.success("✅ Fase 4 actualizada correctamente");
     } catch (err: any) {
-      alert(err?.message || "No se pudo eliminar foto ❌");
+      toast.error(err?.message || "❌ No se pudo guardar la foto grupal");
     } finally {
       setLoading(false);
     }
@@ -77,66 +98,102 @@ export default function PhotoGroupCapture({ meeting, onUpdated }: Props) {
   return (
     <Card>
       <CardContent>
-        <Stack spacing={1}>
+        <Stack spacing={1.5}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <CameraAltIcon color="primary" />
+            <GroupsIcon color="primary" />
             <Typography variant="h6" sx={{ fontWeight: 900 }}>
               Fase 4 · Fotografía grupal 📸
             </Typography>
           </Stack>
 
           <Typography variant="body2" color="text.secondary">
-            Captura o carga una foto grupal como evidencia final física.
+            Sube o reemplaza la fotografía grupal. La imagen se guarda en backend y se muestra protegida con JWT.
           </Typography>
 
-          <Divider sx={{ my: 1 }} />
+          <Divider />
 
-          {existing ? (
-            <Box className="evidence-preview">
-              <img src={existing.imageUrl} alt="Foto grupal" />
-            </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              Sin foto cargada 🫙
+          {/* 🖼️ Imagen actual */}
+          <Box>
+            <Typography sx={{ fontWeight: 900, mb: 1 }}>
+              Foto actual guardada
             </Typography>
-          )}
 
-          <input
-            ref={inputRef}
-            hidden
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleUpload(f);
-            }}
-          />
+            <ProtectedImage
+              filePath={existing?.imagePath}
+              alt="Foto grupal actual"
+              height={320}
+            />
+          </Box>
 
-          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          {/* 👀 Preview nueva */}
+          {photoPreviewUrl ? (
+            <Box>
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>
+                Nueva foto seleccionada (preview) 👀
+              </Typography>
+
+              <Box
+                sx={{
+                  borderRadius: 2,
+                  overflow: "hidden",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  bgcolor: "#fff",
+                }}
+              >
+                <img
+                  src={photoPreviewUrl}
+                  alt="Preview nueva foto grupal"
+                  style={{
+                    width: "100%",
+                    maxHeight: 320,
+                    objectFit: "contain",
+                    display: "block",
+                    background: "#fff",
+                  }}
+                />
+              </Box>
+            </Box>
+          ) : null}
+
+          {/* 🎛️ Acciones */}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            justifyContent="flex-end"
+          >
             <Button
-              variant="contained"
-              startIcon={existing ? <UploadFileIcon /> : <CameraAltIcon />}
-              disabled={loading}
-              onClick={handlePick}
+              component="label"
+              variant="outlined"
+              startIcon={existing?.imagePath ? <UploadFileIcon /> : <CameraAltIcon />}
               sx={{ borderRadius: 2 }}
             >
-              {existing ? "Reemplazar" : "Cargar"} 📤
+              {existing?.imagePath ? "Reemplazar foto" : "Subir foto"}
+              <input
+                hidden
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  handleSelectFile(file);
+                }}
+              />
             </Button>
 
-            {existing ? (
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteOutlineIcon />}
-                disabled={loading}
-                onClick={handleRemove}
-                sx={{ borderRadius: 2 }}
-              >
-                Quitar 🗑️
-              </Button>
-            ) : null}
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={!photoFile || loading}
+              sx={{ borderRadius: 2 }}
+            >
+              {loading ? "Guardando... ⏳" : "Guardar Fase 4 📤"}
+            </Button>
           </Stack>
+
+          <Typography variant="caption" color="text.secondary">
+            💡 Puedes reemplazar la fotografía grupal las veces que sea necesario.
+          </Typography>
         </Stack>
       </CardContent>
     </Card>

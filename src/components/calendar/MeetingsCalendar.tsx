@@ -1,17 +1,14 @@
 // src/components/calendar/MeetingsCalendar.tsx
 /**
- * 📅 MeetingsCalendar (MUI X Date Pickers)
+ * 📅 MeetingsCalendar
  * -----------------------------------------
- * - Calendario mensual bonito ✨
- * - Marca días con reuniones 🧾
- * - Al seleccionar un día, muestra reuniones de ese día 📌
- *
- * Nota:
- * - Para "agenda tipo Google Calendar" usaríamos FullCalendar
- * - Pero este enfoque es estable, rápido y suficiente para MVP ✅
+ * ✅ Calendario mensual
+ * ✅ Días con badge de reuniones
+ * ✅ Reuniones del día con paginación (5 por página)
+ * ✅ Responsivo 📱💻
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import {
   Badge,
@@ -22,6 +19,7 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  Pagination,
   Stack,
   Typography,
 } from "@mui/material";
@@ -34,15 +32,15 @@ import { formatDateShort } from "../../utils/format";
 
 type Props = {
   meetings: Meeting[];
-  onOpenMeeting?: (meetingId: string) => void; // 🔗 click a detalle
+  onOpenMeeting?: (meetingId: string) => void;
 };
 
-/** 📌 Helper: Normaliza a "YYYY-MM-DD" */
+const DAY_PAGE_SIZE = 5;
+
 function toDayKey(iso: string) {
   return dayjs(iso).format("YYYY-MM-DD");
 }
 
-/** 🧩 Día custom con badge */
 function MeetingBadgedDay(
   props: PickersDayProps<Dayjs> & { meetingCount?: number }
 ) {
@@ -68,44 +66,59 @@ function MeetingBadgedDay(
 
 export default function MeetingsCalendar({ meetings, onOpenMeeting }: Props) {
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [dayPage, setDayPage] = useState(1);
 
-  /** 🧠 Mapa: díaKey -> reuniones */
   const meetingsByDay = useMemo(() => {
     const map = new Map<string, Meeting[]>();
+
     for (const m of meetings) {
       const key = dayjs(m.core.dateISO).format("YYYY-MM-DD");
       const list = map.get(key) ?? [];
       list.push(m);
       map.set(key, list);
     }
+
     return map;
   }, [meetings]);
 
-  /** 📌 Reuniones del día seleccionado */
   const dayMeetings = useMemo(() => {
     const key = selectedDate.format("YYYY-MM-DD");
     const list = meetingsByDay.get(key) ?? [];
-    // Orden por hora (si luego agregas hora) o por createdAt
-    return [...list].sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
+
+    return [...list].sort((a, b) =>
+      a.core.dateISO > b.core.dateISO ? 1 : -1
+    );
   }, [meetingsByDay, selectedDate]);
 
-  /** 📅 Conteo por día para badges */
   const dayCounts = useMemo(() => {
     const counts = new Map<string, number>();
+
     for (const m of meetings) {
       const key = toDayKey(m.core.dateISO);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
+
     return counts;
   }, [meetings]);
 
+  const dayTotalPages = Math.max(1, Math.ceil(dayMeetings.length / DAY_PAGE_SIZE));
+
+  const paginatedDayMeetings = useMemo(() => {
+    const start = (dayPage - 1) * DAY_PAGE_SIZE;
+    return dayMeetings.slice(start, start + DAY_PAGE_SIZE);
+  }, [dayMeetings, dayPage]);
+
+  useEffect(() => {
+    setDayPage(1);
+  }, [selectedDate]);
+
   return (
-    <Card>
+    <Card sx={{ height: "100%" }}>
       <CardContent>
         <Stack
-          direction={{ xs: "column", md: "row" }}
+          direction={{ xs: "column", lg: "row" }}
           spacing={2.5}
-          alignItems={{ xs: "stretch", md: "flex-start" }}
+          alignItems={{ xs: "stretch", lg: "flex-start" }}
         >
           {/* 📅 Calendario */}
           <Box sx={{ flex: 1 }}>
@@ -130,12 +143,12 @@ export default function MeetingsCalendar({ meetings, onOpenMeeting }: Props) {
             />
 
             <Typography variant="caption" color="text.secondary">
-              💡 Tip: los números sobre un día indican cuántas reuniones hay.
+              💡 Los números sobre un día indican cuántas reuniones hay.
             </Typography>
           </Box>
 
-          {/* 📌 Panel del día */}
-          <Box sx={{ flex: 1.2 }}>
+          {/* 📌 Reuniones del día */}
+          <Box sx={{ flex: 1.15 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>
               Reuniones del día 📌
             </Typography>
@@ -152,6 +165,7 @@ export default function MeetingsCalendar({ meetings, onOpenMeeting }: Props) {
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
                 {formatDateShort(selectedDate.toISOString())}
               </Typography>
+
               <Typography variant="caption" color="text.secondary">
                 {dayMeetings.length === 0
                   ? "Sin reuniones registradas 🫙"
@@ -163,35 +177,55 @@ export default function MeetingsCalendar({ meetings, onOpenMeeting }: Props) {
 
             {dayMeetings.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No hay reuniones para esta fecha. Puedes crear una nueva desde “Reuniones” ➕
+                No hay reuniones para esta fecha.
               </Typography>
             ) : (
-              <List dense disablePadding>
-                {dayMeetings.map((m) => (
-                  <ListItemButton
-                    key={m.id}
-                    onClick={() => onOpenMeeting?.(m.id)}
-                    sx={{
-                      borderRadius: 2,
-                      mb: 0.8,
-                      border: "1px solid rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography sx={{ fontWeight: 800 }}>
-                          {m.core.type} · {m.core.sede}
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography variant="caption" color="text.secondary">
-                          {m.core.municipio} · Sección {m.core.seccion}
-                        </Typography>
-                      }
+              <>
+                <List dense disablePadding>
+                  {paginatedDayMeetings.map((m) => (
+                    <ListItemButton
+                      key={m.id}
+                      onClick={() => onOpenMeeting?.(m.id)}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 0.8,
+                        border: "1px solid rgba(0,0,0,0.06)",
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Typography sx={{ fontWeight: 800 }}>
+                            {m.core.type} · {m.core.sede}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            {m.core.municipio} · Sección {m.core.seccion}
+                          </Typography>
+                        }
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+
+                {dayMeetings.length > DAY_PAGE_SIZE ? (
+                  <Stack alignItems="center" sx={{ mt: 1.5 }}>
+                    <Pagination
+                      count={dayTotalPages}
+                      page={dayPage}
+                      onChange={(_, value) => setDayPage(value)}
+                      size="small"
+                      color="primary"
+                      shape="rounded"
+                      showFirstButton
+                      showLastButton
                     />
-                  </ListItemButton>
-                ))}
-              </List>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                      Mostrando {paginatedDayMeetings.length} de {dayMeetings.length}
+                    </Typography>
+                  </Stack>
+                ) : null}
+              </>
             )}
           </Box>
         </Stack>
