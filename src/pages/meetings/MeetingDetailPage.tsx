@@ -96,50 +96,88 @@ export default function MeetingDetailPage() {
   const flow = useMemo(() => {
     if (!meeting) return [];
 
-    const phase = meeting.currentPhase ?? 1;
+    const hasValue = (value: unknown) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+
+    const hasNumber = (value: unknown) =>
+      value !== null &&
+      value !== undefined &&
+      String(value).trim() !== "" &&
+      !Number.isNaN(Number(value));
+
+    // ✅ Fase 1
+    const phase1Complete = true;
+
+    // ✅ Fase 2
+    const phase2Complete =
+      hasValue(meeting.raw?.Facebook1) &&
+      hasValue(meeting.raw?.Youtube1) &&
+      hasValue(meeting.raw?.Whatsapp1) &&
+      hasNumber(meeting.raw?.FacebookValor1) &&
+      hasNumber(meeting.raw?.YoutubeValor1) &&
+      hasNumber(meeting.raw?.WhatsappValor1);
+
+    // ✅ Fase 3
+    const phase3Complete =
+      (meeting.metrics?.adultsCount ?? 0) + (meeting.metrics?.minorsCount ?? 0) > 0;
+
+    // ✅ Fase 4
+    const phase4Complete = hasValue(meeting.raw?.FotoGrupal);
+
+    // ✅ Fase 5
+    const phase5Complete =
+      hasValue(meeting.raw?.Facebook2) &&
+      hasValue(meeting.raw?.Youtube2) &&
+      hasValue(meeting.raw?.Whatsapp2) &&
+      hasNumber(meeting.raw?.FacebookValor2) &&
+      hasNumber(meeting.raw?.YoutubeValor2) &&
+      hasNumber(meeting.raw?.WhatsappValor2);
+
+    // ✅ Fase 6
+    const phase6Complete = meeting.status === "COMPLETADA";
 
     return [
       {
         phase: 1,
         label: "Fase 1 · Alta 🧾",
-        statusLabel: phase >= 1 ? "Completa ✅" : "Pendiente",
+        statusLabel: phase1Complete ? "Completa ✅" : "Pendiente",
         statusColor: "success",
-        completed: phase >= 1,
+        completed: phase1Complete,
       },
       {
         phase: 2,
         label: "Fase 2 · Inicial 📸",
-        statusLabel: phase >= 2 ? "Completa ✅" : "Pendiente",
-        statusColor: "success",
-        completed: phase >= 2,
+        statusLabel: phase2Complete ? "Completa ✅" : "Pendiente",
+        statusColor: phase2Complete ? "success" : "warning",
+        completed: phase2Complete,
       },
       {
         phase: 3,
         label: "Fase 3 · Asistencias 👥",
-        statusLabel: phase >= 3 ? "Completa ✅" : "Pendiente",
-        statusColor: "warning",
-        completed: phase >= 3,
+        statusLabel: phase3Complete ? "Completa ✅" : "Pendiente",
+        statusColor: phase3Complete ? "success" : "warning",
+        completed: phase3Complete,
       },
       {
         phase: 4,
         label: "Fase 4 · Foto grupal 📷",
-        statusLabel: phase >= 4 ? "Completa ✅" : "Pendiente",
-        statusColor: "warning",
-        completed: phase >= 4,
+        statusLabel: phase4Complete ? "Completa ✅" : "Pendiente",
+        statusColor: phase4Complete ? "success" : "warning",
+        completed: phase4Complete,
       },
       {
         phase: 5,
         label: "Fase 5 · Final 📸",
-        statusLabel: phase >= 5 ? "Completa ✅" : "Pendiente",
-        statusColor: "warning",
-        completed: phase >= 5,
+        statusLabel: phase5Complete ? "Completa ✅" : "Pendiente",
+        statusColor: phase5Complete ? "success" : "warning",
+        completed: phase5Complete,
       },
       {
         phase: 6,
         label: "Fase 6 · Comparación ✅",
-        statusLabel: phase >= 6 ? "Completa ✅" : "Pendiente",
-        statusColor: "warning",
-        completed: phase >= 6,
+        statusLabel: phase6Complete ? "Completa ✅" : "Pendiente",
+        statusColor: phase6Complete ? "success" : "warning",
+        completed: phase6Complete,
       },
     ];
   }, [meeting]);

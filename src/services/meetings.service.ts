@@ -1,19 +1,16 @@
 // src/services/meetings.service.ts
 /**
- * 🔁 Meetings Service (REAL + HÍBRIDO)
- * -----------------------------------------
- * ✅ REAL API:
- * - listMeetings()
- * - listMeetingsByDate()
- * - getMeeting()
- * - createMeeting()
- * - updateMeeting()
- * - cancelMeeting()
+ * 🌐 Meetings Service
+ * ---------------------------------------------------
+ * Servicio para reuniones/agendas
  *
- * 🧪 MOCK temporal:
- * - setPhaseStatus()
- * - addAdultAttendance()
- * - addMinorAttendance()
+ * ✅ Incluye:
+ * - listado
+ * - detalle
+ * - create
+ * - update
+ * - cancel
+ * - mapper con raw original
  */
 
 import { http } from "./http";
@@ -21,460 +18,221 @@ import { findSectionById } from "./catalogs.service";
 
 import type {
   Meeting,
-  MeetingCore,
-  MeetingFlow,
-  MeetingPhase,
-  PhaseStatus,
+  MeetingEvidence,
+  MeetingRawAgenda,
+  MeetingStatus,
   MeetingType,
 } from "../models/meeting";
-import { computeMeetingMetrics, computeMeetingStatus } from "../models/meeting";
-import type { AttendanceAdult, AttendanceMinor } from "../models/attendance";
-import { buildQrValue } from "../utils/id";
 
-// 🧪 mocks temporales
-import {
-  mockAddAdultAttendance,
-  mockAddMinorAttendance,
-  mockSetPhaseStatus,
-} from "../mocks/meetings.mock";
-import { loadDB, saveDB } from "../mocks/db";
-
-type StoreAgendaResponse = {
+type ApiListResponse = {
   success: boolean;
-  message: string;
-  data: {
-    IdReunion: number;
-    FechaAgenda: string;
-    Sede: string;
-    Organizador: string;
-    Enlace: string;
-    IdSeccion: number;
-    Direccion: string;
-    Latitud: number;
-    Longitud: number;
-    IdUser: number;
-    LLave: string;
-    Fase: number;
-    Estado: number;
-    updated_at: string;
-    created_at: string;
-    IdAgenda: number;
-  };
+  data: MeetingRawAgenda[];
 };
 
-type UpdateAgendaResponse = {
+type ApiSingleResponse = {
   success: boolean;
-  message: string;
-  data?: unknown;
+  data: MeetingRawAgenda;
 };
 
-type CancelAgendaResponse = {
-  success: boolean;
-  message: string;
-  data: {
-    IdAgenda: number;
-    Estado: number;
-  };
-};
-
-type AgendaApiRow = {
-  IdAgenda: number;
-  IdReunion: number;
-  FechaAgenda: string;
-  Sede: string;
-  Organizador: string;
-  Enlace: string;
-  IdSeccion: number;
-  Direccion: string;
-  Latitud: number;
-  Longitud: number;
-  Fase: number;
-  Youtube1: string | null;
-  Facebook1: string | null;
-  Whatsapp1: string | null;
-  YoutubeValor1: number | null;
-  FacebookValor1: number | null;
-  WhatsappValor1: number | null;
-  FotoGrupal: string | null;
-  Youtube2: string | null;
-  Facebook2: string | null;
-  Whatsapp2: string | null;
-  YoutubeValor2: number | null;
-  FacebookValor2: number | null;
-  WhatsappValor2: number | null;
-  QR: string | null;
-  Llave: string | null;
-  Estado: number;
-  IdUser: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type GetAgendasResponse = {
-  success: boolean;
-  data: AgendaApiRow[];
-};
-
-type GetAgendaResponse = {
-  success: boolean;
-  data: AgendaApiRow;
-};
-
-/** 🔢 Front -> Backend */
-function meetingTypeToIdReunion(type: MeetingType): number {
-  return type === "ASAMBLEA" ? 1 : 2;
+function hasValue(value: unknown) {
+  return value !== null && value !== undefined && String(value).trim() !== "";
 }
 
-/** 🔁 Backend -> Front */
-function idReunionToMeetingType(idReunion: number): MeetingType {
-  return Number(idReunion) === 1 ? "ASAMBLEA" : "EVENTO";
+function mapMeetingType(idReunion?: number | null): MeetingType {
+  return Number(idReunion) === 2 ? "EVENTO" : "ASAMBLEA";
 }
 
-/**
- * 🧠 Flow real desde getAgenda
- * -----------------------------------------
- * Regla:
- * - Fase 1: existe agenda
- * - Fase 2: si hay al menos una evidencia inicial o si backend ya va >=2
- * - Fase 3: si backend va >=3 (aún no viene conteo aquí)
- * - Fase 4: si hay FotoGrupal o backend ya va >=4
- * - Fase 5: si hay al menos una evidencia final o si backend ya va >=5
- * - Fase 6: si Estado=3 o backend ya va >=6
- *
- * Estado:
- * - 3 = finalizada ✅
- * - 4 = cancelada 🚫
- */
-function buildFlowFromAgenda(row: AgendaApiRow): MeetingFlow {
-  const hasInitial =
-    Boolean(row.Facebook1) || Boolean(row.Youtube1) || Boolean(row.Whatsapp1);
+function mapAgendaStatus(idEstado?: number | null): MeetingStatus {
+  switch (Number(idEstado)) {
+    case 3:
+      return "COMPLETADA";
+    case 4:
+      return "OBSERVADA";
+    case 1:
+      return "BORRADOR";
+    case 2:
+    default:
+      return "EN_PROCESO";
+  }
+}
 
-  const hasFinal =
-    Boolean(row.Facebook2) || Boolean(row.Youtube2) || Boolean(row.Whatsapp2);
+function buildEvidenceList(raw: MeetingRawAgenda): MeetingEvidence[] {
+  const list: MeetingEvidence[] = [];
 
-  const hasGroupPhoto = Boolean(row.FotoGrupal);
-
-  if (Number(row.Estado) === 3) {
-    return {
-      1: "COMPLETADA",
-      2: "COMPLETADA",
-      3: "COMPLETADA",
-      4: "COMPLETADA",
-      5: "COMPLETADA",
-      6: "COMPLETADA",
-    };
+  if (hasValue(raw.Facebook1)) {
+    list.push({
+      id: `fb-1-${raw.IdAgenda}`,
+      type: "INICIAL_DIGITAL",
+      platform: "FB",
+      imagePath: raw.Facebook1 ?? null,
+      value: raw.FacebookValor1 ?? null,
+    });
   }
 
-  if (Number(row.Estado) === 4) {
-    return {
-      1: "OBSERVADA",
-      2: hasInitial ? "COMPLETADA" : "PENDIENTE",
-      3: Number(row.Fase) >= 3 ? "COMPLETADA" : "PENDIENTE",
-      4: hasGroupPhoto ? "COMPLETADA" : "PENDIENTE",
-      5: hasFinal ? "COMPLETADA" : "PENDIENTE",
-      6: "OBSERVADA",
-    };
+  if (hasValue(raw.Youtube1)) {
+    list.push({
+      id: `yt-1-${raw.IdAgenda}`,
+      type: "INICIAL_DIGITAL",
+      platform: "YT",
+      imagePath: raw.Youtube1 ?? null,
+      value: raw.YoutubeValor1 ?? null,
+    });
   }
+
+  if (hasValue(raw.Whatsapp1)) {
+    list.push({
+      id: `wa-1-${raw.IdAgenda}`,
+      type: "INICIAL_DIGITAL",
+      platform: "WA",
+      imagePath: raw.Whatsapp1 ?? null,
+      value: raw.WhatsappValor1 ?? null,
+    });
+  }
+
+  if (hasValue(raw.FotoGrupal)) {
+    list.push({
+      id: `group-${raw.IdAgenda}`,
+      type: "FOTO_GRUPAL",
+      platform: "FISICA",
+      imagePath: raw.FotoGrupal ?? null,
+      value: null,
+    });
+  }
+
+  if (hasValue(raw.Facebook2)) {
+    list.push({
+      id: `fb-2-${raw.IdAgenda}`,
+      type: "FINAL_DIGITAL",
+      platform: "FB",
+      imagePath: raw.Facebook2 ?? null,
+      value: raw.FacebookValor2 ?? null,
+    });
+  }
+
+  if (hasValue(raw.Youtube2)) {
+    list.push({
+      id: `yt-2-${raw.IdAgenda}`,
+      type: "FINAL_DIGITAL",
+      platform: "YT",
+      imagePath: raw.Youtube2 ?? null,
+      value: raw.YoutubeValor2 ?? null,
+    });
+  }
+
+  if (hasValue(raw.Whatsapp2)) {
+    list.push({
+      id: `wa-2-${raw.IdAgenda}`,
+      type: "FINAL_DIGITAL",
+      platform: "WA",
+      imagePath: raw.Whatsapp2 ?? null,
+      value: raw.WhatsappValor2 ?? null,
+    });
+  }
+
+  return list;
+}
+
+async function mapAgendaToMeeting(raw: MeetingRawAgenda): Promise<Meeting> {
+  const sectionInfo = await findSectionById(raw.IdSeccion);
+
+  const municipio = sectionInfo?.Municipio ?? "SIN MUNICIPIO";
+  const distritoLocal = sectionInfo?.IdDistritoLocal ?? "-";
+  const distritoFederal = sectionInfo?.IdDistritoFederal ?? "-";
+
+  const evidences = buildEvidenceList(raw);
 
   return {
-    1: "COMPLETADA",
-    2: hasInitial || Number(row.Fase) >= 2 ? "COMPLETADA" : "PENDIENTE",
-    3: Number(row.Fase) >= 3 ? "COMPLETADA" : "PENDIENTE",
-    4: hasGroupPhoto || Number(row.Fase) >= 4 ? "COMPLETADA" : "PENDIENTE",
-    5: hasFinal || Number(row.Fase) >= 5 ? "COMPLETADA" : "PENDIENTE",
-    6: Number(row.Fase) >= 6 ? "COMPLETADA" : "PENDIENTE",
-  };
-}
-
-function upsertMeetingToMock(meeting: Meeting) {
-  const db = loadDB();
-  const idx = db.meetings.findIndex((m) => m.id === meeting.id);
-
-  if (idx >= 0) db.meetings[idx] = meeting;
-  else db.meetings.push(meeting);
-
-  saveDB(db);
-}
-
-async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
-  const section = await findSectionById(row.IdSeccion);
-  const flow = buildFlowFromAgenda(row);
-
-  const evidences: Meeting["evidences"] = [
-    row.Youtube1
-      ? {
-          id: `yt1-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "INICIAL_DIGITAL",
-          platform: "YT",
-          imagePath: row.Youtube1,
-          imageUrl: "",
-          value: row.YoutubeValor1,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.Facebook1
-      ? {
-          id: `fb1-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "INICIAL_DIGITAL",
-          platform: "FB",
-          imagePath: row.Facebook1,
-          imageUrl: "",
-          value: row.FacebookValor1,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.Whatsapp1
-      ? {
-          id: `wa1-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "INICIAL_DIGITAL",
-          platform: "WA",
-          imagePath: row.Whatsapp1,
-          imageUrl: "",
-          value: row.WhatsappValor1,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.FotoGrupal
-      ? {
-          id: `foto-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "FOTO_GRUPAL",
-          platform: "FISICA",
-          imagePath: row.FotoGrupal,
-          imageUrl: "",
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.Youtube2
-      ? {
-          id: `yt2-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "FINAL_DIGITAL",
-          platform: "YT",
-          imagePath: row.Youtube2,
-          imageUrl: "",
-          value: row.YoutubeValor2,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.Facebook2
-      ? {
-          id: `fb2-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "FINAL_DIGITAL",
-          platform: "FB",
-          imagePath: row.Facebook2,
-          imageUrl: "",
-          value: row.FacebookValor2,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-    row.Whatsapp2
-      ? {
-          id: `wa2-${row.IdAgenda}`,
-          meetingId: String(row.IdAgenda),
-          type: "FINAL_DIGITAL",
-          platform: "WA",
-          imagePath: row.Whatsapp2,
-          imageUrl: "",
-          value: row.WhatsappValor2,
-          createdAtISO: row.updated_at,
-        }
-      : null,
-  ].filter(Boolean) as Meeting["evidences"];
-
-  const meeting: Meeting = {
-    id: String(row.IdAgenda),
-    createdAtISO: row.created_at,
-    updatedAtISO: row.updated_at,
-
-    status: computeMeetingStatus(flow),
+    id: String(raw.IdAgenda),
+    currentPhase: Number(raw.Fase || 1),
+    status: mapAgendaStatus(raw.IdEstado),
 
     core: {
-      type: idReunionToMeetingType(row.IdReunion),
-      dateISO: String(row.FechaAgenda).slice(0, 10),
-      sede: row.Sede || "",
-      location: {
-        lat: Number(row.Latitud || 0),
-        lng: Number(row.Longitud || 0),
+      type: mapMeetingType(raw.IdReunion),
+      dateISO: String(raw.FechaAgenda || "").slice(0, 10),
+      sede: raw.Sede || "",
+      organizer: {
+        name: raw.Organizador || "",
       },
-      address: row.Direccion || "",
-      organizer: { name: row.Organizador || "" },
-      enlace: { name: row.Enlace || "" },
-      distritoFederal: section ? String(section.IdDistritoFederal) : "",
-      distritoLocal: section ? String(section.IdDistritoLocal) : "",
-      municipio: section?.Municipio || "",
-      seccion: String(row.IdSeccion || ""),
+      enlace: {
+        name: raw.Enlace || "",
+      },
+      municipio,
+      seccion: raw.IdSeccion ?? "",
+      distritoLocal,
+      distritoFederal,
+      address: raw.Direccion || "",
+      location: {
+        lat: Number(raw.Latitud ?? 0),
+        lng: Number(raw.Longitud ?? 0),
+      },
     },
-
-    flow,
-
-    qr: {
-      qrValue: row.Llave || row.QR || buildQrValue(String(row.IdAgenda)),
-      generatedAtISO: row.created_at,
-    },
-
-    evidences,
-    attendanceAdults: [],
-    attendanceMinors: [],
 
     metrics: {
       adultsCount: 0,
       minorsCount: 0,
       evidenceCount: evidences.length,
-      lastUpdateISO: row.updated_at,
     },
+
+    qr: {
+      qrValue: raw.Llave || "",
+    },
+
+    evidences,
+
+    createdAtISO: raw.created_at || undefined,
+    updatedAtISO: raw.updated_at || undefined,
+
+    // 🔥 guardamos el raw completo
+    raw,
   };
-
-  meeting.metrics = computeMeetingMetrics(meeting);
-  meeting.status = computeMeetingStatus(meeting.flow);
-
-  return meeting;
 }
 
+/** 📋 Listar reuniones */
 export async function listMeetings(): Promise<Meeting[]> {
-  const res = await http.get<GetAgendasResponse>("/getAgendas");
+  const res = await http.get<ApiListResponse>("/getAgendas");
   const rows = Array.isArray(res.data?.data) ? res.data.data : [];
 
-  const meetings = await Promise.all(rows.map(mapAgendaRowToMeeting));
-  meetings.forEach(upsertMeetingToMock);
-
-  return meetings.sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
+  return Promise.all(rows.map(mapAgendaToMeeting));
 }
 
+/** 📅 Listar reuniones por fecha */
 export async function listMeetingsByDate(dateISO: string): Promise<Meeting[]> {
-  const res = await http.get<GetAgendasResponse>("/getAgendas", {
-    params: { FechaAgenda: dateISO },
+  const res = await http.get<ApiListResponse>("/getAgendas", {
+    params: {
+      FechaAgenda: dateISO,
+    },
   });
 
   const rows = Array.isArray(res.data?.data) ? res.data.data : [];
-  const meetings = await Promise.all(rows.map(mapAgendaRowToMeeting));
-  meetings.forEach(upsertMeetingToMock);
-
-  return meetings.sort((a, b) => (a.createdAtISO < b.createdAtISO ? 1 : -1));
+  return Promise.all(rows.map(mapAgendaToMeeting));
 }
 
-export async function getMeeting(meetingId: string): Promise<Meeting> {
-  const res = await http.get<GetAgendaResponse>(`/getAgenda/${meetingId}`);
-  const row = res.data?.data;
+/** 🔎 Obtener detalle de agenda */
+export async function getMeeting(idAgenda: string | number): Promise<Meeting> {
+  const res = await http.get<ApiSingleResponse>(`/getAgenda/${idAgenda}`);
+  const raw = res.data?.data;
 
-  if (!row) throw new Error("Reunión no encontrada ❌");
+  if (!raw) {
+    throw new Error("No se encontró la agenda solicitada");
+  }
 
-  const meeting = await mapAgendaRowToMeeting(row);
-  upsertMeetingToMock(meeting);
-
-  return meeting;
+  return mapAgendaToMeeting(raw);
 }
 
-export async function createMeeting(core: MeetingCore): Promise<Meeting> {
-  const payload = {
-    IdReunion: meetingTypeToIdReunion(core.type),
-    FechaAgenda: core.dateISO,
-    Sede: core.sede,
-    Organizador: core.organizer.name,
-    Enlace: core.enlace.name,
-    IdSeccion: Number(core.seccion),
-    Direccion: core.address,
-    Latitud: Number(core.location.lat),
-    Longitud: Number(core.location.lng),
-  };
-
-  const res = await http.post<StoreAgendaResponse>("/storeagenda", payload);
-  const row = res.data?.data;
-
-  const mapped = await mapAgendaRowToMeeting({
-    IdAgenda: row.IdAgenda,
-    IdReunion: row.IdReunion,
-    FechaAgenda: row.FechaAgenda,
-    Sede: row.Sede,
-    Organizador: row.Organizador,
-    Enlace: row.Enlace,
-    IdSeccion: row.IdSeccion,
-    Direccion: row.Direccion,
-    Latitud: row.Latitud,
-    Longitud: row.Longitud,
-    Fase: row.Fase,
-    Youtube1: null,
-    Facebook1: null,
-    Whatsapp1: null,
-    YoutubeValor1: null,
-    FacebookValor1: null,
-    WhatsappValor1: null,
-    FotoGrupal: null,
-    Youtube2: null,
-    Facebook2: null,
-    Whatsapp2: null,
-    YoutubeValor2: null,
-    FacebookValor2: null,
-    WhatsappValor2: null,
-    QR: null,
-    Llave: row.LLave,
-    Estado: row.Estado,
-    IdUser: row.IdUser,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  });
-
-  upsertMeetingToMock(mapped);
-  return mapped;
+/** ➕ Crear agenda */
+export async function createMeeting(payload: Record<string, any>) {
+  const res = await http.post("/storeagenda", payload);
+  return res.data;
 }
 
-export async function updateMeeting(meetingId: string, core: MeetingCore): Promise<Meeting> {
-  const payload = {
-    IdReunion: meetingTypeToIdReunion(core.type),
-    FechaAgenda: core.dateISO,
-    Sede: core.sede,
-    Organizador: core.organizer.name,
-    Enlace: core.enlace.name,
-    IdSeccion: Number(core.seccion),
-    Direccion: core.address,
-    Latitud: Number(core.location.lat),
-    Longitud: Number(core.location.lng),
-  };
-
-  await http.put<UpdateAgendaResponse>(`/updateAgenda/${meetingId}`, payload);
-
-  const updated = await getMeeting(meetingId);
-  upsertMeetingToMock(updated);
-  return updated;
+/** ✏️ Actualizar agenda */
+export async function updateMeeting(idAgenda: string | number, payload: Record<string, any>) {
+  const res = await http.put(`/updateAgenda/${idAgenda}`, payload);
+  return res.data;
 }
 
 /** 🚫 Cancelar agenda */
-export async function cancelMeeting(meetingId: string): Promise<Meeting> {
-  await http.post<CancelAgendaResponse>(`/cancelarAgenda/${meetingId}`, null, {
-    headers: { accept: "application/json" },
-  });
-
-  const updated = await getMeeting(meetingId);
-  upsertMeetingToMock(updated);
-  return updated;
-}
-
-/* =========================================================
- * 🧪 MOCK TEMPORAL OTRAS FASES
- * ========================================================= */
-
-export async function setPhaseStatus(
-  meetingId: string,
-  phase: MeetingPhase,
-  status: PhaseStatus
-): Promise<Meeting> {
-  return mockSetPhaseStatus(meetingId, phase, status);
-}
-
-export async function addAdultAttendance(
-  meetingId: string,
-  payload: Omit<AttendanceAdult, "id" | "meetingId" | "createdAtISO">
-): Promise<Meeting> {
-  return mockAddAdultAttendance(meetingId, payload);
-}
-
-export async function addMinorAttendance(
-  meetingId: string,
-  payload: Omit<AttendanceMinor, "id" | "meetingId" | "createdAtISO">
-): Promise<Meeting> {
-  return mockAddMinorAttendance(meetingId, payload);
+export async function cancelMeeting(idAgenda: string | number) {
+  const res = await http.post(`/cancelarAgenda/${idAgenda}`);
+  return res.data;
 }
