@@ -26,7 +26,8 @@ export async function getProtectedImageBlobUrl(filePath: string): Promise<string
   const res = await http.get("/getImage", {
     params: { url: filePath },
     responseType: "blob",
-  });
+    __showGlobalLoader: false,
+  } as any);
 
   return URL.createObjectURL(res.data);
 }

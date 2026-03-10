@@ -6,7 +6,9 @@
  * ✅ Cola global para GET
  * ✅ Retry automático para 429
  * ✅ Respeta Retry-After
+ * ✅ Loader global fullscreen
  */
+
 import axios from "axios";
 import type {
   AxiosError,
@@ -18,6 +20,7 @@ import type {
 
 import { clearSession, getToken, getTokenType } from "../store/auth.store";
 import { getRequestScheduler } from "../utils/requestScheduler";
+import { loadingService } from "./loading.service";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -26,6 +29,7 @@ const API_BASE_URL =
 type ExtendedConfig = InternalAxiosRequestConfig & {
   __skipGetQueue?: boolean;
   __retryCount?: number;
+  __showGlobalLoader?: boolean;
 };
 
 function sleep(ms: number) {
@@ -41,7 +45,7 @@ function parseRetryAfter(value?: string | null): number | null {
 
   const asNumber = Number(value);
   if (!Number.isNaN(asNumber)) {
-    return asNumber * 1000; // header en segundos
+    return asNumber * 1000;
   }
 
   const asDate = new Date(value).getTime();
@@ -76,38 +80,56 @@ instance.interceptors.request.use(
 
     const method = String(config.method || "get").toLowerCase();
 
-    // ✅ Solo en GET aplicamos la cola
+    // ✅ Por defecto todas las requests muestran loader
+    if (config.__showGlobalLoader !== false) {
+      loadingService.show();
+    }
+
+    // ✅ Cola solo para GET
     if (method === "get" && !config.__skipGetQueue) {
       await getRequestScheduler.enqueue(async () => config);
     }
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    loadingService.hide();
+    return Promise.reject(error);
+  }
 );
 
 /* =========================================================
  * 🚨 Response interceptor
  * ========================================================= */
 instance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config as ExtendedConfig;
+
+    if (config.__showGlobalLoader !== false) {
+      loadingService.hide();
+    }
+
+    return response;
+  },
   async (error: AxiosError) => {
     const response = error.response;
     const config = error.config as ExtendedConfig | undefined;
+
+    if (config?.__showGlobalLoader !== false) {
+      loadingService.hide();
+    }
 
     if (response?.status === 401) {
       clearSession();
       return Promise.reject(error);
     }
 
-    // 🔥 Retry automático solo para GET y solo en 429
     const isGet = String(config?.method || "get").toLowerCase() === "get";
     const canRetry = isGet && response?.status === 429 && config;
 
     if (canRetry) {
       config.__retryCount = config.__retryCount ?? 0;
 
-      // máximo 2 reintentos
       if (config.__retryCount < 2) {
         config.__retryCount += 1;
 
@@ -116,7 +138,6 @@ instance.interceptors.response.use(
           Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : retryAfterHeader
         );
 
-        // si backend manda Retry-After lo respetamos
         const waitMs =
           retryAfterMs ??
           randomBetween(2500, 4500) * config.__retryCount;
@@ -135,7 +156,6 @@ export const http = instance;
 
 /**
  * ⚡ GET inmediato sin cola
- * Solo si un caso especial lo necesita
  */
 export async function httpGetImmediate<T = unknown>(
   url: string,

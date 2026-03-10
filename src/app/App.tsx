@@ -7,7 +7,12 @@
 
 import React from "react";
 import AppRoutes from "./routes";
+import GlobalLoadingOverlay from "../components/ui/GlobalLoadingOverlay";
 
 export default function App() {
-  return <AppRoutes />;
+  return (<>
+    <AppRoutes />
+    <GlobalLoadingOverlay />
+  </>)
+;
 }
