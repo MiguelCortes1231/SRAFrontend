@@ -1,4 +1,14 @@
 // src/pages/meetings/MeetingPreviewPage.tsx
+/**
+ * 👁️ MeetingPreviewPage
+ * -----------------------------------------
+ * ✅ Vista bonita por fases
+ * ✅ PDF profesional sin cortes feos
+ * ✅ Secciones separadas para PDF
+ * ✅ Fase 3 dividida en bloques pequeños
+ * ✅ Mapa, QR, evidencias e info completa
+ */
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -36,26 +46,52 @@ import { getMeeting } from "../../services/meetings.service";
 import { listAttendancePersons } from "../../services/attendance.service";
 import { formatDateShort } from "../../utils/format";
 
+const ATTENDANCE_CHUNK_SIZE = 4;
+
+/* =========================================================
+ * 🧩 Helpers
+ * ========================================================= */
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function PhaseBlock({
   title,
   subtitle,
   children,
+  pdfSection = true,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  pdfSection?: boolean;
 }) {
   return (
-    <Card sx={{ borderRadius: 3 }}>
+    <Card
+      sx={{
+        borderRadius: 3,
+        mb: 2,
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
+      }}
+      data-pdf-section={pdfSection ? "true" : undefined}
+    >
       <CardContent>
         <Typography variant="h6" sx={{ fontWeight: 900 }}>
           {title}
         </Typography>
+
         {subtitle ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {subtitle}
           </Typography>
         ) : null}
+
         {children}
       </CardContent>
     </Card>
@@ -79,10 +115,14 @@ function EvidenceCard({
         border: "1px solid rgba(0,0,0,0.08)",
         bgcolor: "#fff",
         height: "100%",
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
       }}
     >
       <Typography sx={{ fontWeight: 900, mb: 1 }}>{title}</Typography>
+
       <ProtectedImage filePath={filePath} alt={title} height={220} />
+
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
         {value !== undefined && value !== null
           ? `Valor registrado: ${value}`
@@ -91,6 +131,10 @@ function EvidenceCard({
     </Box>
   );
 }
+
+/* =========================================================
+ * 📄 Página principal
+ * ========================================================= */
 
 export default function MeetingPreviewPage() {
   const navigate = useNavigate();
@@ -151,44 +195,91 @@ export default function MeetingPreviewPage() {
     };
   }, [meeting]);
 
+  const attendanceChunks = useMemo(
+    () => chunkArray(attendance, ATTENDANCE_CHUNK_SIZE),
+    [attendance]
+  );
+
+  /**
+   * 📄 Generador PDF bonito por secciones
+   * -----------------------------------------
+   * Ya no captura todo como una sola imagen gigante.
+   * Captura cada sección marcada con data-pdf-section,
+   * y las agrega ordenadamente al PDF evitando cortes feos.
+   */
   const handleDownloadPdf = async () => {
     if (!reportRef.current || !meeting) return;
 
     try {
       setGeneratingPdf(true);
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        ignoreElements: (element) =>
-          element.hasAttribute?.("data-pdf-exclude"),
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-
       const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const marginX = 10;
+      const marginY = 10;
+      const usableWidth = pageWidth - marginX * 2;
+      const usableHeight = pageHeight - marginY * 2;
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      let cursorY = marginY;
+      let isFirstPage = true;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
+      const sections = Array.from(
+        reportRef.current.querySelectorAll<HTMLElement>("[data-pdf-section='true']")
+      );
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+      for (const section of sections) {
+        const canvas = await html2canvas(section, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          ignoreElements: (element) => element.hasAttribute?.("data-pdf-exclude"),
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = usableWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        // ✅ Si no cabe en la página actual, mandamos la sección completa a la siguiente
+        if (!isFirstPage && cursorY + imgHeight > pageHeight - marginY) {
+          pdf.addPage();
+          cursorY = marginY;
+        }
+
+        // ✅ Si una sección por sí sola es más alta que una hoja, la partimos con dignidad
+        if (imgHeight <= usableHeight) {
+          pdf.addImage(imgData, "PNG", marginX, cursorY, imgWidth, imgHeight);
+          cursorY += imgHeight + 6;
+        } else {
+          // troceo por páginas solo para esa sección
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          if (!isFirstPage && cursorY !== marginY) {
+            pdf.addPage();
+            cursorY = marginY;
+          }
+
+          pdf.addImage(imgData, "PNG", marginX, cursorY, imgWidth, imgHeight);
+          heightLeft -= usableHeight;
+
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, "PNG", marginX, marginY + position, imgWidth, imgHeight);
+            heightLeft -= usableHeight;
+          }
+
+          cursorY = marginY + 6;
+        }
+
+        isFirstPage = false;
       }
 
       pdf.save(`reporte-agenda-${meeting.id}.pdf`);
-      toast.success("✅ PDF generado correctamente");
+      toast.success("✅ PDF generado correctamente y sin cortes feos");
     } catch (err: any) {
       toast.error(err?.message || "❌ No se pudo generar el PDF");
     } finally {
@@ -246,7 +337,13 @@ export default function MeetingPreviewPage() {
       />
 
       <div ref={reportRef}>
-        <Card sx={{ borderRadius: 3, mb: 2 }}>
+        {/* =========================================================
+         * ENCABEZADO EJECUTIVO
+         * ========================================================= */}
+        <Card
+          sx={{ borderRadius: 3, mb: 2 }}
+          data-pdf-section="true"
+        >
           <CardContent>
             <Stack
               direction={{ xs: "column", md: "row" }}
@@ -315,7 +412,9 @@ export default function MeetingPreviewPage() {
           </CardContent>
         </Card>
 
-        {/* Fase 1 */}
+        {/* =========================================================
+         * FASE 1
+         * ========================================================= */}
         <PhaseBlock
           title="Fase 1 · Alta de reunión 🧾"
           subtitle="Datos principales, ubicación y coordenadas."
@@ -345,6 +444,7 @@ export default function MeetingPreviewPage() {
                   <PlaceIcon color="primary" />
                   <Typography sx={{ fontWeight: 900 }}>Mapa de ubicación</Typography>
                 </Stack>
+
                 <ReadOnlyMeetingMap
                   lat={meeting.core.location.lat}
                   lng={meeting.core.location.lng}
@@ -356,83 +456,125 @@ export default function MeetingPreviewPage() {
           </Grid>
         </PhaseBlock>
 
-        {/* Fase 2 */}
+        {/* =========================================================
+         * FASE 2
+         * ========================================================= */}
         <PhaseBlock
           title="Fase 2 · Evidencia Inicial Digital 📸"
           subtitle="Estado inicial de redes sociales."
         >
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="Facebook inicial 📘" filePath={ev.initialFB?.imagePath} value={ev.initialFB?.value} />
+              <EvidenceCard
+                title="Facebook inicial 📘"
+                filePath={ev.initialFB?.imagePath}
+                value={ev.initialFB?.value}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="YouTube inicial ▶️" filePath={ev.initialYT?.imagePath} value={ev.initialYT?.value} />
+              <EvidenceCard
+                title="YouTube inicial ▶️"
+                filePath={ev.initialYT?.imagePath}
+                value={ev.initialYT?.value}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="WhatsApp inicial 💬" filePath={ev.initialWA?.imagePath} value={ev.initialWA?.value} />
+              <EvidenceCard
+                title="WhatsApp inicial 💬"
+                filePath={ev.initialWA?.imagePath}
+                value={ev.initialWA?.value}
+              />
             </Grid>
           </Grid>
         </PhaseBlock>
 
-        {/* Fase 3 */}
-        <PhaseBlock
-          title="Fase 3 · Lista de asistencia 👥"
-          subtitle="Personas registradas para la agenda."
-        >
-          {attendance.length === 0 ? (
+        {/* =========================================================
+         * FASE 3 - BLOQUES PEQUEÑOS PARA EVITAR CORTES FEOS
+         * ========================================================= */}
+        {attendanceChunks.length === 0 ? (
+          <PhaseBlock
+            title="Fase 3 · Lista de asistencia 👥"
+            subtitle="Personas registradas para la agenda."
+          >
             <Alert severity="info">Aún no hay personas registradas en esta agenda 🫙</Alert>
-          ) : (
-            <Stack spacing={1.2}>
-              {attendance.map((person) => (
-                <Card key={person.IdListado} variant="outlined" sx={{ borderRadius: 2 }}>
-                  <CardContent>
-                    <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1}>
-                      <Box sx={{ flex: 1 }}>
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                          <GroupsIcon color="primary" fontSize="small" />
-                          <Typography sx={{ fontWeight: 900 }}>
-                            {person.Nombre} {person.PrimerApellido} {person.SegundoApellido}
-                          </Typography>
-                          <Chip
-                            size="small"
-                            label={Number(person.EsMenor) === 1 ? "17 años 👦" : "Ciudadano 👤"}
-                            color={Number(person.EsMenor) === 1 ? "warning" : "primary"}
-                            variant="outlined"
-                          />
-                        </Stack>
+          </PhaseBlock>
+        ) : (
+          attendanceChunks.map((group, idx) => (
+            <PhaseBlock
+              key={`attendance-group-${idx}`}
+              title={
+                attendanceChunks.length === 1
+                  ? "Fase 3 · Lista de asistencia 👥"
+                  : `Fase 3 · Lista de asistencia 👥 (Parte ${idx + 1} de ${attendanceChunks.length})`
+              }
+              subtitle="Personas registradas para la agenda."
+            >
+              <Stack spacing={1.2}>
+                {group.map((person) => (
+                  <Card
+                    key={person.IdListado}
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 2,
+                      breakInside: "avoid",
+                      pageBreakInside: "avoid",
+                    }}
+                  >
+                    <CardContent>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        justifyContent="space-between"
+                        spacing={1}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                            <GroupsIcon color="primary" fontSize="small" />
+                            <Typography sx={{ fontWeight: 900 }}>
+                              {person.Nombre} {person.PrimerApellido} {person.SegundoApellido}
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={Number(person.EsMenor) === 1 ? "17 años 👦" : "Ciudadano 👤"}
+                              color={Number(person.EsMenor) === 1 ? "warning" : "primary"}
+                              variant="outlined"
+                            />
+                          </Stack>
 
-                        <Typography variant="body2" color="text.secondary">
-                          CURP: <strong>{person.CURP}</strong>
-                        </Typography>
-
-                        {person.ClaveElector ? (
                           <Typography variant="body2" color="text.secondary">
-                            Clave de Elector: <strong>{person.ClaveElector}</strong>
+                            CURP: <strong>{person.CURP}</strong>
                           </Typography>
-                        ) : null}
 
-                        <Typography variant="body2" color="text.secondary">
-                          Sección: <strong>{person.IdSeccion}</strong> · Sexo: <strong>{person.Sexo}</strong> ·
-                          Fecha Nacimiento: <strong>{person.FechaNacimiento}</strong>
-                        </Typography>
+                          {person.ClaveElector ? (
+                            <Typography variant="body2" color="text.secondary">
+                              Clave de Elector: <strong>{person.ClaveElector}</strong>
+                            </Typography>
+                          ) : null}
 
-                        <Typography variant="body2" color="text.secondary">
-                          {person.Domicilio}, {person.Colonia}, CP {person.CodigoPostal}
-                        </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Sección: <strong>{person.IdSeccion}</strong> · Sexo: <strong>{person.Sexo}</strong> ·
+                            Fecha Nacimiento: <strong>{person.FechaNacimiento}</strong>
+                          </Typography>
 
-                        <Typography variant="body2" color="text.secondary">
-                          Teléfono: <strong>{person.Telefono}</strong>
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
-          )}
-        </PhaseBlock>
+                          <Typography variant="body2" color="text.secondary">
+                            {person.Domicilio}, {person.Colonia}, CP {person.CodigoPostal}
+                          </Typography>
 
-        {/* Fase 4 */}
+                          <Typography variant="body2" color="text.secondary">
+                            Teléfono: <strong>{person.Telefono}</strong>
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            </PhaseBlock>
+          ))
+        )}
+
+        {/* =========================================================
+         * FASE 4
+         * ========================================================= */}
         <PhaseBlock
           title="Fase 4 · Fotografía Grupal 📷"
           subtitle="Evidencia fotográfica del evento."
@@ -440,34 +582,61 @@ export default function MeetingPreviewPage() {
           <EvidenceCard title="Foto grupal 📸" filePath={ev.group?.imagePath} />
         </PhaseBlock>
 
-        {/* Fase 5 */}
+        {/* =========================================================
+         * FASE 5
+         * ========================================================= */}
         <PhaseBlock
           title="Fase 5 · Evidencia Final Digital 📸"
           subtitle="Estado final de redes sociales."
         >
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="Facebook final 📘" filePath={ev.finalFB?.imagePath} value={ev.finalFB?.value} />
+              <EvidenceCard
+                title="Facebook final 📘"
+                filePath={ev.finalFB?.imagePath}
+                value={ev.finalFB?.value}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="YouTube final ▶️" filePath={ev.finalYT?.imagePath} value={ev.finalYT?.value} />
+              <EvidenceCard
+                title="YouTube final ▶️"
+                filePath={ev.finalYT?.imagePath}
+                value={ev.finalYT?.value}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <EvidenceCard title="WhatsApp final 💬" filePath={ev.finalWA?.imagePath} value={ev.finalWA?.value} />
+              <EvidenceCard
+                title="WhatsApp final 💬"
+                filePath={ev.finalWA?.imagePath}
+                value={ev.finalWA?.value}
+              />
             </Grid>
           </Grid>
         </PhaseBlock>
 
-        {/* Fase 6 */}
+        {/* =========================================================
+         * FASE 6
+         * ========================================================= */}
         <PhaseBlock
           title="Fase 6 · Comparación y cierre ✅"
           subtitle="Comparativa visual de evidencias y estado final de la agenda."
         >
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Box sx={{ p: 1.2, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}>
+              <Box
+                sx={{
+                  p: 1.2,
+                  borderRadius: 2,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  breakInside: "avoid",
+                  pageBreakInside: "avoid",
+                }}
+              >
                 <Typography sx={{ fontWeight: 900, mb: 1 }}>Resumen del cierre</Typography>
-                <Typography><strong>Estatus:</strong> {isCompleted ? "Completada ✅" : isCancelled ? "Cancelada 🚫" : "En proceso 🧭"}</Typography>
+                <Typography>
+                  <strong>Estatus:</strong>{" "}
+                  {isCompleted ? "Completada ✅" : isCancelled ? "Cancelada 🚫" : "En proceso 🧭"}
+                </Typography>
                 <Typography><strong>Llave / QR:</strong> {meeting.qr.qrValue}</Typography>
                 <Typography><strong>Evidencias totales:</strong> {meeting.metrics.evidenceCount}</Typography>
                 <Typography><strong>Última actualización:</strong> {meeting.updatedAtISO}</Typography>
@@ -475,14 +644,24 @@ export default function MeetingPreviewPage() {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Box sx={{ p: 1.2, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}>
+              <Box
+                sx={{
+                  p: 1.2,
+                  borderRadius: 2,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  breakInside: "avoid",
+                  pageBreakInside: "avoid",
+                }}
+              >
                 <Typography sx={{ fontWeight: 900, mb: 1 }}>Conteo de asistentes</Typography>
                 <Typography><strong>Total registrados:</strong> {attendance.length}</Typography>
                 <Typography>
-                  <strong>Ciudadanos:</strong> {attendance.filter((x) => Number(x.EsMenor) === 0).length}
+                  <strong>Ciudadanos:</strong>{" "}
+                  {attendance.filter((x) => Number(x.EsMenor) === 0).length}
                 </Typography>
                 <Typography>
-                  <strong>17 años:</strong> {attendance.filter((x) => Number(x.EsMenor) === 1).length}
+                  <strong>17 años:</strong>{" "}
+                  {attendance.filter((x) => Number(x.EsMenor) === 1).length}
                 </Typography>
               </Box>
             </Grid>
