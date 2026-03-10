@@ -10,6 +10,11 @@ import { theme } from "./theme/theme";
 // 🗓️ MUI X Date Pickers
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { esES as pickersEsES } from "@mui/x-date-pickers/locales";
+
+// 🌎 Dayjs en español
+import dayjs from "dayjs";
+import "dayjs/locale/es";
 
 // 🗺️ Leaflet CSS
 import "leaflet/dist/leaflet.css";
@@ -23,16 +28,22 @@ import "./index.css";
 import "./App.css";
 import "./styles/app.css";
 
+// ✅ Fuerza locale global en español
+dayjs.locale("es");
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
 
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <LocalizationProvider
+        dateAdapter={AdapterDayjs}
+        adapterLocale="es"
+        localeText={pickersEsES.components.MuiLocalizationProvider.defaultProps.localeText}
+      >
         <BrowserRouter>
           <App />
 
-          {/* 🔔 Toasts globales */}
           <ToastContainer
             position="top-right"
             autoClose={2600}
