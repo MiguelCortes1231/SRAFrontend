@@ -160,7 +160,10 @@ export default function EvidenceUploadCard({
 
   return (
     <Card>
-      <CardContent>
+      <CardContent  sx={{
+        px: { xs: 2, sm: 3, md: 4 },
+        py: 3,
+      }}>
         <Stack spacing={1}>
           <Typography variant="h6" sx={{ fontWeight: 900 }}>
             {title}
