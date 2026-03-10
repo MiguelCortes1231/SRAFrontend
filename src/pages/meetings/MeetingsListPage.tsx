@@ -190,7 +190,6 @@ export default function MeetingsListPage() {
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
             <MenuItem value="ALL">Todos</MenuItem>
-            <MenuItem value="BORRADOR">Borrador ✍️</MenuItem>
             <MenuItem value="EN_PROCESO">En proceso 🧭</MenuItem>
             <MenuItem value="COMPLETADA">Completada ✅</MenuItem>
             <MenuItem value="OBSERVADA">Cancelada 🚫</MenuItem>
