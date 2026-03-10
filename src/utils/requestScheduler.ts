@@ -30,8 +30,8 @@ class RequestScheduler {
   private readonly maxConcurrent = 1;
 
   // ⏱️ espera aleatoria entre 1000 y 2000 ms
-  private readonly minDelayMs = 1000;
-  private readonly maxDelayMs = 2000;
+  private readonly minDelayMs = 200;
+  private readonly maxDelayMs = 500;
 
   enqueue<T>(job: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
