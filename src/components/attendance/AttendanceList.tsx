@@ -19,9 +19,15 @@ type Props = {
   rows: AttendancePersonRow[];
   onEdit: (row: AttendancePersonRow) => void;
   onDelete: (row: AttendancePersonRow) => void;
+  readOnly?: boolean;
 };
 
-export default function AttendanceList({ rows, onEdit, onDelete }: Props) {
+export default function AttendanceList({
+  rows,
+  onEdit,
+  onDelete,
+  readOnly = false,
+}: Props) {
   if (rows.length === 0) {
     return (
       <Card>
@@ -85,15 +91,17 @@ export default function AttendanceList({ rows, onEdit, onDelete }: Props) {
                 </Typography>
               </Box>
 
-              <Stack direction="row" spacing={1}>
-                <IconButton color="primary" onClick={() => onEdit(row)}>
-                  <EditIcon />
-                </IconButton>
+              {!readOnly ? (
+                <Stack direction="row" spacing={1}>
+                  <IconButton color="primary" onClick={() => onEdit(row)}>
+                    <EditIcon />
+                  </IconButton>
 
-                <IconButton color="error" onClick={() => onDelete(row)}>
-                  <DeleteIcon />
-                </IconButton>
-              </Stack>
+                  <IconButton color="error" onClick={() => onDelete(row)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Stack>
+              ) : null}
             </Stack>
           </CardContent>
         </Card>

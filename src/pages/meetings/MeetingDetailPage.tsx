@@ -151,7 +151,7 @@ export default function MeetingDetailPage() {
 
             {isCompleted ? (
               <Alert severity="success" sx={{ mt: 1 }}>
-                Esta agenda ya está completada ✅
+                Esta agenda ya está completada ✅. El contenido se muestra en modo solo lectura.
               </Alert>
             ) : null}
 
@@ -214,11 +214,19 @@ export default function MeetingDetailPage() {
           title="Fase 2 · Evidencia Inicial Digital"
           description="Sube o reemplaza Facebook, YouTube y WhatsApp con sus valores actuales."
           onUpdated={(m) => setMeeting(m)}
+          readOnly={Boolean(isCompleted)}
         />
 
-        <AttendancePhaseSection agendaId={meeting.id} />
+        <AttendancePhaseSection
+          agendaId={meeting.id}
+          readOnly={Boolean(isCompleted)}
+        />
 
-        <PhotoGroupCapture meeting={meeting} onUpdated={(m) => setMeeting(m)} />
+        <PhotoGroupCapture
+          meeting={meeting}
+          onUpdated={(m) => setMeeting(m)}
+          readOnly={Boolean(isCompleted)}
+        />
 
         <EvidenceUploadCard
           meeting={meeting}
@@ -226,6 +234,7 @@ export default function MeetingDetailPage() {
           title="Fase 5 · Evidencia Final Digital"
           description="Sube o reemplaza Facebook, YouTube y WhatsApp finales con sus valores actuales."
           onUpdated={(m) => setMeeting(m)}
+          readOnly={Boolean(isCompleted)}
         />
 
         <EvidenceComparePanel meeting={meeting} />

@@ -1,19 +1,4 @@
 // src/components/evidence/EvidenceUploadCard.tsx
-/**
- * 📤 EvidenceUploadCard
- * -----------------------------------------
- * ✅ Reusable para:
- * - Fase 2 (INICIAL)
- * - Fase 5 (FINAL)
- *
- * Soporta:
- * - Facebook / YouTube / WhatsApp
- * - valores por red
- * - reemplazar imagen
- * - preview protegida
- * - toasts
- */
-
 import React, { useMemo, useState } from "react";
 import {
   Box,
@@ -25,6 +10,7 @@ import {
   Stack,
   TextField,
   Typography,
+  Alert,
 } from "@mui/material";
 
 import FacebookIcon from "@mui/icons-material/Facebook";
@@ -32,6 +18,7 @@ import YouTubeIcon from "@mui/icons-material/YouTube";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import SaveIcon from "@mui/icons-material/Save";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { toast } from "react-toastify";
 
@@ -45,6 +32,7 @@ type Props = {
   title: string;
   description: string;
   onUpdated: (meeting: Meeting) => void;
+  readOnly?: boolean;
 };
 
 export default function EvidenceUploadCard({
@@ -53,6 +41,7 @@ export default function EvidenceUploadCard({
   title,
   description,
   onUpdated,
+  readOnly = false,
 }: Props) {
   const [loading, setLoading] = useState(false);
 
@@ -181,6 +170,12 @@ export default function EvidenceUploadCard({
             {description}
           </Typography>
 
+          {readOnly ? (
+            <Alert severity="info" icon={<VisibilityIcon />}>
+              Esta fase se muestra en modo solo lectura porque la agenda está completada ✅
+            </Alert>
+          ) : null}
+
           <Divider sx={{ my: 1 }} />
 
           <Grid container spacing={2}>
@@ -207,26 +202,28 @@ export default function EvidenceUploadCard({
                   />
 
                   <Stack spacing={1.2} sx={{ mt: 1.2 }}>
-                    <Button
-                      component="label"
-                      variant="outlined"
-                      startIcon={<UploadFileIcon />}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      {item.existing?.imagePath ? "Reemplazar imagen" : "Subir imagen"}
-                      <input
-                        hidden
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] ?? null;
-                          item.setFile(file);
-                          if (file) {
-                            toast.info(`📤 Imagen lista para ${item.label}`);
-                          }
-                        }}
-                      />
-                    </Button>
+                    {!readOnly ? (
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        startIcon={<UploadFileIcon />}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        {item.existing?.imagePath ? "Reemplazar imagen" : "Subir imagen"}
+                        <input
+                          hidden
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] ?? null;
+                            item.setFile(file);
+                            if (file) {
+                              toast.info(`📤 Imagen lista para ${item.label}`);
+                            }
+                          }}
+                        />
+                      </Button>
+                    ) : null}
 
                     {item.file ? (
                       <Typography variant="caption" color="text.secondary">
@@ -238,6 +235,7 @@ export default function EvidenceUploadCard({
                       label={`Valor actual en ${item.label}`}
                       type="number"
                       value={item.value}
+                      disabled={readOnly}
                       onChange={(e) =>
                         item.setValue(e.target.value === "" ? "" : Number(e.target.value))
                       }
@@ -249,21 +247,25 @@ export default function EvidenceUploadCard({
             ))}
           </Grid>
 
-          <Divider sx={{ my: 2 }} />
+          {!readOnly ? (
+            <>
+              <Divider sx={{ my: 2 }} />
 
-          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end">
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              disabled={loading}
-              onClick={handleSave}
-              sx={{ borderRadius: 2 }}
-            >
-              {loading
-                ? `Guardando Fase ${phase}... ⏳`
-                : `Guardar Fase ${phase} 📤`}
-            </Button>
-          </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end">
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  disabled={loading}
+                  onClick={handleSave}
+                  sx={{ borderRadius: 2 }}
+                >
+                  {loading
+                    ? `Guardando Fase ${phase}... ⏳`
+                    : `Guardar Fase ${phase} 📤`}
+                </Button>
+              </Stack>
+            </>
+          ) : null}
         </Stack>
       </CardContent>
     </Card>

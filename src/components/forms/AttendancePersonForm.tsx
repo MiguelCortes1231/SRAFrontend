@@ -23,6 +23,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { toast } from "react-toastify";
 
@@ -53,6 +54,7 @@ type Props = {
   onCreate: (payload: AttendancePersonPayload) => Promise<void>;
   onUpdate: (idListado: number, payload: AttendancePersonPayload) => Promise<void>;
   onCancelEdit?: () => void;
+  readOnly?: boolean;
 };
 
 type FormState = AttendancePersonPayload;
@@ -79,6 +81,7 @@ export default function AttendancePersonForm({
   onCreate,
   onUpdate,
   onCancelEdit,
+  readOnly = false,
 }: Props) {
   const [personType, setPersonType] = useState<AttendancePersonType>("CIUDADANO");
   const [captureMode, setCaptureMode] = useState<AttendanceCaptureMode>("MANUAL");
@@ -94,7 +97,6 @@ export default function AttendancePersonForm({
 
   const [saving, setSaving] = useState(false);
 
-  // ✅ cargar catálogo
   useEffect(() => {
     let alive = true;
 
@@ -117,7 +119,6 @@ export default function AttendancePersonForm({
     };
   }, []);
 
-  // 🖼️ preview OCR
   useEffect(() => {
     if (!ocrFile) {
       setOcrPreviewUrl(null);
@@ -132,7 +133,6 @@ export default function AttendancePersonForm({
     };
   }, [ocrFile]);
 
-  // ✏️ edición
   useEffect(() => {
     if (!editingPerson) return;
 
@@ -217,7 +217,7 @@ export default function AttendancePersonForm({
     return list;
   }, [form, personType, duplicateError]);
 
-  const canSave = errors.length === 0 && !saving && !sectionsLoading;
+  const canSave = errors.length === 0 && !saving && !sectionsLoading && !readOnly;
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -331,135 +331,141 @@ export default function AttendancePersonForm({
             Captura una persona por vez. Puedes alternar entre menor de 17 años y ciudadano, con captura manual u OCR.
           </Typography>
 
-          {/* 👤 Tipo */}
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-            <Box>
-              <Typography sx={{ fontWeight: 900, mb: 0.8 }}>Tipo de persona</Typography>
-              <ToggleButtonGroup
-                exclusive
-                value={personType}
-                onChange={(_, value) => {
-                  if (!value) return;
-                  setPersonType(value);
-                  if (value === "MENOR_17") setCaptureMode("MANUAL");
-                }}
-                size="small"
-                color="primary"
-              >
-                <ToggleButton value="MENOR_17">17 años 👦</ToggleButton>
-                <ToggleButton value="CIUDADANO">Ciudadano 👤</ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
+          {readOnly ? (
+            <Alert severity="info" icon={<VisibilityIcon />}>
+              La agenda está completada ✅. El formulario de captura se muestra en modo solo lectura.
+            </Alert>
+          ) : null}
 
-            <Box>
-              <Typography sx={{ fontWeight: 900, mb: 0.8 }}>Modo de captura</Typography>
-              <ToggleButtonGroup
-                exclusive
-                value={captureMode}
-                onChange={(_, value) => {
-                  if (!value) return;
-                  setCaptureMode(value);
-                }}
-                size="small"
-                color="primary"
-              >
-                <ToggleButton value="MANUAL">Manual ✍️</ToggleButton>
-                <ToggleButton value="OCR" disabled={personType === "MENOR_17"}>
-                  OCR INE 📸
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-          </Stack>
-
-          {/* 📸 OCR */}
-          {personType === "CIUDADANO" && captureMode === "OCR" ? (
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: 3,
-                bgcolor: "rgba(108,56,65,0.05)",
-                border: "1px solid rgba(108,56,65,0.15)",
-              }}
-            >
-              <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                Escaneo de INE con OCR 🧠📸
-              </Typography>
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <Button component="label" variant="outlined" startIcon={<UploadFileIcon />}>
-                  {ocrFile ? "Reemplazar INE" : "Subir INE"}
-                  <input
-                    hidden
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      setOcrFile(f);
+          {!readOnly ? (
+            <>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <Box>
+                  <Typography sx={{ fontWeight: 900, mb: 0.8 }}>Tipo de persona</Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    value={personType}
+                    onChange={(_, value) => {
+                      if (!value) return;
+                      setPersonType(value);
+                      if (value === "MENOR_17") setCaptureMode("MANUAL");
                     }}
-                  />
-                </Button>
+                    size="small"
+                    color="primary"
+                  >
+                    <ToggleButton value="MENOR_17">17 años 👦</ToggleButton>
+                    <ToggleButton value="CIUDADANO">Ciudadano 👤</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
 
-                <Button
-                  variant="contained"
-                  startIcon={<AutoFixHighIcon />}
-                  onClick={handleScanOcr}
-                  disabled={!ocrFile || ocrLoading}
-                >
-                  {ocrLoading ? "Escaneando... ⏳" : "Escanear OCR"}
-                </Button>
+                <Box>
+                  <Typography sx={{ fontWeight: 900, mb: 0.8 }}>Modo de captura</Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    value={captureMode}
+                    onChange={(_, value) => {
+                      if (!value) return;
+                      setCaptureMode(value);
+                    }}
+                    size="small"
+                    color="primary"
+                  >
+                    <ToggleButton value="MANUAL">Manual ✍️</ToggleButton>
+                    <ToggleButton value="OCR" disabled={personType === "MENOR_17"}>
+                      OCR INE 📸
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
               </Stack>
 
-              {ocrFile ? (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-                  Archivo cargado: <strong>{ocrFile.name}</strong>
-                </Typography>
-              ) : null}
-
-              {/* 👀 Preview de INE */}
-              {ocrPreviewUrl ? (
+              {personType === "CIUDADANO" && captureMode === "OCR" ? (
                 <Box
                   sx={{
-                    mt: 2,
+                    p: 2,
                     borderRadius: 3,
-                    overflow: "hidden",
-                    border: "1px solid rgba(0,0,0,0.10)",
-                    bgcolor: "#fff",
+                    bgcolor: "rgba(108,56,65,0.05)",
+                    border: "1px solid rgba(108,56,65,0.15)",
                   }}
                 >
-                  <img
-                    src={ocrPreviewUrl}
-                    alt="Previsualización INE"
-                    style={{
-                      width: "100%",
-                      maxHeight: 340,
-                      objectFit: "contain",
-                      display: "block",
-                      background: "#fff",
-                    }}
-                  />
+                  <Typography sx={{ fontWeight: 900, mb: 1 }}>
+                    Escaneo de INE con OCR 🧠📸
+                  </Typography>
+
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <Button component="label" variant="outlined" startIcon={<UploadFileIcon />}>
+                      {ocrFile ? "Reemplazar INE" : "Subir INE"}
+                      <input
+                        hidden
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null;
+                          setOcrFile(f);
+                        }}
+                      />
+                    </Button>
+
+                    <Button
+                      variant="contained"
+                      startIcon={<AutoFixHighIcon />}
+                      onClick={handleScanOcr}
+                      disabled={!ocrFile || ocrLoading}
+                    >
+                      {ocrLoading ? "Escaneando... ⏳" : "Escanear OCR"}
+                    </Button>
+                  </Stack>
+
+                  {ocrFile ? (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                      Archivo cargado: <strong>{ocrFile.name}</strong>
+                    </Typography>
+                  ) : null}
+
+                  {ocrPreviewUrl ? (
+                    <Box
+                      sx={{
+                        mt: 2,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        border: "1px solid rgba(0,0,0,0.10)",
+                        bgcolor: "#fff",
+                      }}
+                    >
+                      <img
+                        src={ocrPreviewUrl}
+                        alt="Previsualización INE"
+                        style={{
+                          width: "100%",
+                          maxHeight: 340,
+                          objectFit: "contain",
+                          display: "block",
+                          background: "#fff",
+                        }}
+                      />
+                    </Box>
+                  ) : null}
+
+                  <Alert
+                    severity="warning"
+                    icon={<WarningAmberIcon />}
+                    sx={{ mt: 2 }}
+                  >
+                    {ocrWarning ||
+                      "⚠️ Siempre verifica los datos antes de guardar. El OCR puede no identificar correctamente algunos campos."}
+                  </Alert>
                 </Box>
               ) : null}
-
-              {/* ⚠️ Siempre advertencia OCR */}
-              <Alert
-                severity="warning"
-                icon={<WarningAmberIcon />}
-                sx={{ mt: 2 }}
-              >
-                {ocrWarning ||
-                  "⚠️ Siempre verifica los datos antes de guardar. El OCR puede no identificar correctamente algunos campos."}
-              </Alert>
-            </Box>
+            </>
           ) : null}
 
           <Divider />
 
-          {/* 🧾 Formulario */}
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <TextField
                 label="Nombre(s)"
                 value={form.Nombre}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ Nombre: e.target.value })}
               />
             </Grid>
@@ -468,6 +474,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Primer Apellido"
                 value={form.PrimerApellido}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ PrimerApellido: e.target.value })}
               />
             </Grid>
@@ -476,6 +483,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Segundo Apellido"
                 value={form.SegundoApellido}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ SegundoApellido: e.target.value })}
               />
             </Grid>
@@ -484,6 +492,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="CURP"
                 value={form.CURP}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ CURP: normalizeCurp(e.target.value) })}
                 inputProps={{ maxLength: 18 }}
               />
@@ -498,7 +507,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Clave de Elector"
                 value={personType === "MENOR_17" ? "" : form.ClaveElector}
-                disabled={personType === "MENOR_17"}
+                disabled={readOnly || personType === "MENOR_17"}
                 placeholder={personType === "MENOR_17" ? "No aplica para menor" : "Ej: ABC123456"}
                 onChange={(e) => patchForm({ ClaveElector: e.target.value })}
               />
@@ -509,6 +518,7 @@ export default function AttendancePersonForm({
                 select
                 label="Sexo"
                 value={form.Sexo}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ Sexo: e.target.value as "H" | "M" })}
               >
                 <MenuItem value="H">Hombre (H)</MenuItem>
@@ -521,6 +531,7 @@ export default function AttendancePersonForm({
                 label="Fecha de nacimiento"
                 type="date"
                 value={form.FechaNacimiento}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ FechaNacimiento: e.target.value })}
                 InputLabelProps={{ shrink: true }}
               />
@@ -531,6 +542,7 @@ export default function AttendancePersonForm({
                 options={sections}
                 loading={sectionsLoading}
                 value={selectedSection}
+                disabled={readOnly}
                 onChange={(_, value) => {
                   patchForm({ IdSeccion: value ? Number(value.IdSeccion) : 0 });
                 }}
@@ -548,6 +560,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Domicilio"
                 value={form.Domicilio}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ Domicilio: e.target.value })}
               />
             </Grid>
@@ -556,6 +569,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Colonia"
                 value={form.Colonia}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ Colonia: e.target.value })}
               />
             </Grid>
@@ -564,6 +578,7 @@ export default function AttendancePersonForm({
               <TextField
                 label="Código Postal"
                 value={form.CodigoPostal}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ CodigoPostal: e.target.value })}
               />
             </Grid>
@@ -572,12 +587,13 @@ export default function AttendancePersonForm({
               <TextField
                 label="Teléfono"
                 value={form.Telefono}
+                disabled={readOnly}
                 onChange={(e) => patchForm({ Telefono: e.target.value })}
               />
             </Grid>
           </Grid>
 
-          {errors.length > 0 ? (
+          {!readOnly && errors.length > 0 ? (
             <Alert severity="warning">
               <strong>Revisa estos puntos:</strong>
               <br />
@@ -585,34 +601,37 @@ export default function AttendancePersonForm({
             </Alert>
           ) : null}
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="flex-end">
-            <Button
-              variant="outlined"
-              startIcon={<RestartAltIcon />}
-              onClick={() => {
-                resetForm();
-                onCancelEdit?.();
-              }}
-            >
-              Reiniciar
-            </Button>
+          {!readOnly ? (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                startIcon={<RestartAltIcon />}
+                onClick={() => {
+                  resetForm();
+                  onCancelEdit?.();
+                }}
+              >
+                Reiniciar
+              </Button>
 
-            <Button
-              variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSave}
-              disabled={!canSave}
-            >
-              {saving
-                ? "Guardando... ⏳"
-                : editingPerson
-                ? "Guardar cambios ✏️"
-                : "Agregar persona ✅"}
-            </Button>
-          </Stack>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleSave}
+                disabled={!canSave}
+              >
+                {saving
+                  ? "Guardando... ⏳"
+                  : editingPerson
+                  ? "Guardar cambios ✏️"
+                  : "Agregar persona ✅"}
+              </Button>
+            </Stack>
+          ) : null}
 
           <Typography variant="caption" color="text.secondary">
-            Agenda actual: <strong>{agendaId}</strong> · Después de guardar, el formulario se reinicia para capturar otra persona.
+            Agenda actual: <strong>{agendaId}</strong>
+            {!readOnly ? " · Después de guardar, el formulario se reinicia para capturar otra persona." : ""}
           </Typography>
         </Stack>
       </CardContent>

@@ -1,15 +1,4 @@
 // src/components/attendance/AttendancePhaseSection.tsx
-/**
- * 🧩 AttendancePhaseSection
- * -----------------------------------------
- * Fase 3 real:
- * - Alta de personas uno por uno 👤
- * - Listado en tiempo real 📋
- * - Editar ✏️
- * - Eliminar 🗑️
- * - Modal de edición con botón cerrar arriba y abajo ✅
- */
-
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -28,6 +17,7 @@ import {
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { toast } from "react-toastify";
 
@@ -45,9 +35,13 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 
 type Props = {
   agendaId: string;
+  readOnly?: boolean;
 };
 
-export default function AttendancePhaseSection({ agendaId }: Props) {
+export default function AttendancePhaseSection({
+  agendaId,
+  readOnly = false,
+}: Props) {
   const [rows, setRows] = useState<AttendancePersonRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -56,7 +50,6 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
   const [toDelete, setToDelete] = useState<AttendancePersonRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  /** 🔄 Cargar listado actual */
   const load = async () => {
     try {
       setLoading(true);
@@ -75,25 +68,21 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
     void load();
   }, [agendaId]);
 
-  /** ➕ Alta */
   const handleCreate = async (payload: AttendancePersonPayload) => {
     await createAttendancePerson(agendaId, payload);
     await load();
   };
 
-  /** ✏️ Edición */
   const handleUpdate = async (idListado: number, payload: AttendancePersonPayload) => {
     await updateAttendancePerson(idListado, payload);
     setEditing(null);
     await load();
   };
 
-  /** 🚪 Cerrar modal edición */
   const handleCloseEditModal = () => {
     setEditing(null);
   };
 
-  /** 🗑️ Eliminar */
   const handleDelete = async () => {
     if (!toDelete) return;
 
@@ -114,7 +103,6 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
 
   return (
     <Box>
-      {/* 🧠 Header */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
@@ -134,24 +122,30 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
           </Typography>
         </Box>
 
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={() => void load()}
-          sx={{ alignSelf: { xs: "flex-start", md: "center" } }}
-        >
-          Recargar listado
-        </Button>
+        {!readOnly ? (
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => void load()}
+            sx={{ alignSelf: { xs: "flex-start", md: "center" } }}
+          >
+            Recargar listado
+          </Button>
+        ) : null}
       </Stack>
 
-      {/* ❌ Error listado */}
+      {readOnly ? (
+        <Alert severity="info" icon={<VisibilityIcon />} sx={{ mb: 2 }}>
+          La agenda está completada ✅. Esta fase se muestra en modo solo lectura.
+        </Alert>
+      ) : null}
+
       {errorMsg ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {errorMsg}
         </Alert>
       ) : null}
 
-      {/* ➕ Formulario principal de alta */}
       <AttendancePersonForm
         agendaId={agendaId}
         currentList={rows}
@@ -159,11 +153,11 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         onCancelEdit={() => undefined}
+        readOnly={readOnly}
       />
 
       <Divider sx={{ my: 2.5 }} />
 
-      {/* 📋 Listado */}
       <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>
         Personas registradas: {rows.length} 📋
       </Typography>
@@ -178,74 +172,76 @@ export default function AttendancePhaseSection({ agendaId }: Props) {
             toast.info("✏️ Editando persona");
           }}
           onDelete={(row) => setToDelete(row)}
+          readOnly={readOnly}
         />
       )}
 
-      {/* 🗑️ Confirmación de delete */}
-      <ConfirmDialog
-        open={Boolean(toDelete)}
-        title="Eliminar persona"
-        description={`¿Deseas eliminar a ${toDelete?.Nombre || ""} ${toDelete?.PrimerApellido || ""}?`}
-        confirmText={deleting ? "Eliminando... ⏳" : "Sí, eliminar 🗑️"}
-        cancelText="Cancelar"
-        onConfirm={handleDelete}
-        onClose={() => (deleting ? null : setToDelete(null))}
-        danger
-      />
+      {!readOnly ? (
+        <>
+          <ConfirmDialog
+            open={Boolean(toDelete)}
+            title="Eliminar persona"
+            description={`¿Deseas eliminar a ${toDelete?.Nombre || ""} ${toDelete?.PrimerApellido || ""}?`}
+            confirmText={deleting ? "Eliminando... ⏳" : "Sí, eliminar 🗑️"}
+            cancelText="Cancelar"
+            onConfirm={handleDelete}
+            onClose={() => (deleting ? null : setToDelete(null))}
+            danger
+          />
 
-      {/* ✏️ Modal edición */}
-      <Dialog
-        open={Boolean(editing)}
-        onClose={handleCloseEditModal}
-        fullWidth
-        maxWidth="lg"
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 900,
-            pr: 6,
-            position: "relative",
-          }}
-        >
-          Editar persona ✏️
-
-          {/* ❌ Botón cerrar arriba derecha */}
-          <IconButton
-            aria-label="cerrar"
-            onClick={handleCloseEditModal}
-            sx={{
-              position: "absolute",
-              right: 8,
-              top: 8,
-            }}
+          <Dialog
+            open={Boolean(editing)}
+            onClose={handleCloseEditModal}
+            fullWidth
+            maxWidth="lg"
           >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+            <DialogTitle
+              sx={{
+                fontWeight: 900,
+                pr: 6,
+                position: "relative",
+              }}
+            >
+              Editar persona ✏️
 
-        <DialogContent dividers>
-          {editing ? (
-            <AttendancePersonForm
-              agendaId={agendaId}
-              currentList={rows}
-              editingPerson={editing}
-              onCreate={handleCreate}
-              onUpdate={handleUpdate}
-              onCancelEdit={handleCloseEditModal}
-            />
-          ) : null}
-        </DialogContent>
+              <IconButton
+                aria-label="cerrar"
+                onClick={handleCloseEditModal}
+                sx={{
+                  position: "absolute",
+                  right: 8,
+                  top: 8,
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
 
-        {/* ✅ Botones abajo */}
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            variant="outlined"
-            onClick={handleCloseEditModal}
-          >
-            Cerrar
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <DialogContent dividers>
+              {editing ? (
+                <AttendancePersonForm
+                  agendaId={agendaId}
+                  currentList={rows}
+                  editingPerson={editing}
+                  onCreate={handleCreate}
+                  onUpdate={handleUpdate}
+                  onCancelEdit={handleCloseEditModal}
+                  readOnly={false}
+                />
+              ) : null}
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, py: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleCloseEditModal}
+              >
+                Cerrar
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      ) : null}
     </Box>
   );
 }
