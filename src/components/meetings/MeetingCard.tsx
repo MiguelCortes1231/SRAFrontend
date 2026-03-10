@@ -9,6 +9,7 @@ import {
   Divider,
   Box,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 
 import EventNoteIcon from "@mui/icons-material/EventNote";
@@ -18,10 +19,12 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import EditIcon from "@mui/icons-material/Edit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import MapIcon from "@mui/icons-material/Map";
 
 import type { Meeting } from "../../models/meeting";
 import { formatDateShort } from "../../utils/format";
 import MeetingStatusChip from "./MeetingStatusChip";
+import { buildGoogleMapsPlaceUrl } from "../../utils/maps";
 
 type Props = {
   meeting: Meeting;
@@ -41,6 +44,11 @@ export default function MeetingCard({
   const isCancelled = meeting.status === "OBSERVADA";
   const isCompleted = meeting.status === "COMPLETADA";
   const canPreview = isCancelled || isCompleted;
+
+  const mapsUrl = buildGoogleMapsPlaceUrl(
+    meeting.core.location.lat,
+    meeting.core.location.lng
+  );
 
   return (
     <Card
@@ -66,25 +74,41 @@ export default function MeetingCard({
               📅 {formatDateShort(meeting.core.dateISO)} · 📍 {meeting.core.municipio} · Sección{" "}
               <strong>{meeting.core.seccion}</strong>
             </Typography>
+
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.6 }}>
+              {meeting.core.address}
+            </Typography>
           </Box>
 
-          <MeetingStatusChip status={meeting.status} />
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {mapsUrl ? (
+              <Tooltip title="Abrir en Google Maps 🗺️">
+                <IconButton
+                  component="a"
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="primary"
+                  sx={{
+                    border: "1px solid rgba(108,56,65,0.18)",
+                    bgcolor: "rgba(108,56,65,0.06)",
+                    "&:hover": {
+                      bgcolor: "rgba(108,56,65,0.12)",
+                    },
+                  }}
+                >
+                  <MapIcon />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+
+            <MeetingStatusChip status={meeting.status} />
+          </Stack>
         </Stack>
 
         <Divider sx={{ my: 1.4 }} />
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems="flex-start">
-         {/*<Tooltip title="Asistencias">
-            <Stack direction="row" spacing={0.8} alignItems="center">
-              <GroupsIcon fontSize="small" />
-              <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                {meeting.metrics.adultsCount + meeting.metrics.minorsCount}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                asistentes
-              </Typography>
-            </Stack>
-          </Tooltip>*/}
 
           <Tooltip title="Evidencias">
             <Stack direction="row" spacing={0.8} alignItems="center">
