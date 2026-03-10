@@ -6,14 +6,12 @@
  * - getProtectedImageBlobUrl()
  * - uploadPhase2()
  * - uploadPhase4()
+ * - uploadPhase5()
+ * - finalizePhase6()
  *
  * 🧪 MOCK:
  * - addEvidence()
  * - removeEvidence()
- *
- * Nota:
- * Las imágenes protegidas NO deben ir directo en <img src="...">
- * porque necesitan Authorization header. Por eso usamos blob.
  */
 
 import { http } from "./http";
@@ -52,11 +50,9 @@ export async function uploadPhase2(params: {
   if (params.facebookValue !== undefined && params.facebookValue !== null) {
     fd.append("FacebookValor1", String(params.facebookValue));
   }
-
   if (params.youtubeValue !== undefined && params.youtubeValue !== null) {
     fd.append("YoutubeValor1", String(params.youtubeValue));
   }
-
   if (params.whatsappValue !== undefined && params.whatsappValue !== null) {
     fd.append("WhatsappValor1", String(params.whatsappValue));
   }
@@ -85,8 +81,52 @@ export async function uploadPhase4(params: {
   return getMeeting(String(params.agendaId));
 }
 
+/** 📤 Fase 5 real */
+export async function uploadPhase5(params: {
+  agendaId: string | number;
+  facebookFile?: File | null;
+  youtubeFile?: File | null;
+  whatsappFile?: File | null;
+  facebookValue?: number | null;
+  youtubeValue?: number | null;
+  whatsappValue?: number | null;
+}): Promise<Meeting> {
+  const fd = new FormData();
+
+  if (params.facebookFile) fd.append("Facebook2", params.facebookFile);
+  if (params.youtubeFile) fd.append("Youtube2", params.youtubeFile);
+  if (params.whatsappFile) fd.append("Whatsapp2", params.whatsappFile);
+
+  if (params.facebookValue !== undefined && params.facebookValue !== null) {
+    fd.append("FacebookValor2", String(params.facebookValue));
+  }
+  if (params.youtubeValue !== undefined && params.youtubeValue !== null) {
+    fd.append("YoutubeValor2", String(params.youtubeValue));
+  }
+  if (params.whatsappValue !== undefined && params.whatsappValue !== null) {
+    fd.append("WhatsappValor2", String(params.whatsappValue));
+  }
+
+  await http.post(`/fase5/${params.agendaId}`, fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  const { getMeeting } = await import("./meetings.service");
+  return getMeeting(String(params.agendaId));
+}
+
+/** ✅ Fase 6 real */
+export async function finalizePhase6(agendaId: string | number): Promise<Meeting> {
+  await http.post(`/fase6/${agendaId}`, null, {
+    headers: { accept: "application/json" },
+  });
+
+  const { getMeeting } = await import("./meetings.service");
+  return getMeeting(String(agendaId));
+}
+
 /* =========================================================
- * 🧪 MOCK TEMPORAL PARA OTRAS FASES
+ * 🧪 MOCK TEMPORAL PARA OTRAS COSAS
  * ========================================================= */
 
 export async function addEvidence(params: {

@@ -2,13 +2,16 @@
 /**
  * 📤 EvidenceUploadCard
  * -----------------------------------------
- * ✅ Fase 2 real:
- * - Facebook1 + FacebookValor1
- * - Youtube1 + YoutubeValor1
- * - Whatsapp1 + WhatsappValor1
+ * ✅ Reusable para:
+ * - Fase 2 (INICIAL)
+ * - Fase 5 (FINAL)
  *
- * 🔥 Puede reemplazar imágenes siempre
- * 🔔 Usa toasts
+ * Soporta:
+ * - Facebook / YouTube / WhatsApp
+ * - valores por red
+ * - reemplazar imagen
+ * - preview protegida
+ * - toasts
  */
 
 import React, { useMemo, useState } from "react";
@@ -34,10 +37,11 @@ import { toast } from "react-toastify";
 
 import type { Meeting } from "../../models/meeting";
 import ProtectedImage from "./ProtectedImage";
-import { uploadPhase2 } from "../../services/evidence.service";
+import { uploadPhase2, uploadPhase5 } from "../../services/evidence.service";
 
 type Props = {
   meeting: Meeting;
+  phase: 2 | 5;
   title: string;
   description: string;
   onUpdated: (meeting: Meeting) => void;
@@ -45,59 +49,58 @@ type Props = {
 
 export default function EvidenceUploadCard({
   meeting,
+  phase,
   title,
   description,
   onUpdated,
 }: Props) {
   const [loading, setLoading] = useState(false);
 
-  // 📸 Files nuevos (opcionales)
+  const evidenceType = phase === 2 ? "INICIAL_DIGITAL" : "FINAL_DIGITAL";
+
+  const existingFacebook = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === evidenceType && e.platform === "FB"
+      ),
+    [meeting.evidences, evidenceType]
+  );
+
+  const existingYoutube = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === evidenceType && e.platform === "YT"
+      ),
+    [meeting.evidences, evidenceType]
+  );
+
+  const existingWhatsapp = useMemo(
+    () =>
+      meeting.evidences.find(
+        (e) => e.type === evidenceType && e.platform === "WA"
+      ),
+    [meeting.evidences, evidenceType]
+  );
+
   const [facebookFile, setFacebookFile] = useState<File | null>(null);
   const [youtubeFile, setYoutubeFile] = useState<File | null>(null);
   const [whatsappFile, setWhatsappFile] = useState<File | null>(null);
 
-  // 🔢 Valores
-  const initialFacebook = useMemo(
-    () =>
-      meeting.evidences.find(
-        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "FB"
-      ),
-    [meeting.evidences]
-  );
-
-  const initialYoutube = useMemo(
-    () =>
-      meeting.evidences.find(
-        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "YT"
-      ),
-    [meeting.evidences]
-  );
-
-  const initialWhatsapp = useMemo(
-    () =>
-      meeting.evidences.find(
-        (e) => e.type === "INICIAL_DIGITAL" && e.platform === "WA"
-      ),
-    [meeting.evidences]
-  );
-
   const [facebookValue, setFacebookValue] = useState<number | "">(
-    initialFacebook?.value ?? ""
+    existingFacebook?.value ?? ""
   );
   const [youtubeValue, setYoutubeValue] = useState<number | "">(
-    initialYoutube?.value ?? ""
+    existingYoutube?.value ?? ""
   );
   const [whatsappValue, setWhatsappValue] = useState<number | "">(
-    initialWhatsapp?.value ?? ""
+    existingWhatsapp?.value ?? ""
   );
-
-  const canSave = !loading;
 
   const handleSave = async () => {
     try {
       setLoading(true);
 
-      const updated = await uploadPhase2({
+      const payload = {
         agendaId: meeting.id,
         facebookFile,
         youtubeFile,
@@ -105,7 +108,10 @@ export default function EvidenceUploadCard({
         facebookValue: facebookValue === "" ? null : Number(facebookValue),
         youtubeValue: youtubeValue === "" ? null : Number(youtubeValue),
         whatsappValue: whatsappValue === "" ? null : Number(whatsappValue),
-      });
+      };
+
+      const updated =
+        phase === 2 ? await uploadPhase2(payload) : await uploadPhase5(payload);
 
       onUpdated(updated);
 
@@ -113,9 +119,18 @@ export default function EvidenceUploadCard({
       setYoutubeFile(null);
       setWhatsappFile(null);
 
-      toast.success("✅ Fase 2 guardada correctamente");
+      toast.success(
+        phase === 2
+          ? "✅ Fase 2 guardada correctamente"
+          : "✅ Fase 5 guardada correctamente"
+      );
     } catch (err: any) {
-      toast.error(err?.message || "❌ No se pudo guardar Fase 2");
+      toast.error(
+        err?.message ||
+          (phase === 2
+            ? "❌ No se pudo guardar Fase 2"
+            : "❌ No se pudo guardar Fase 5")
+      );
     } finally {
       setLoading(false);
     }
@@ -126,7 +141,7 @@ export default function EvidenceUploadCard({
       key: "facebook",
       label: "Facebook",
       icon: <FacebookIcon color="primary" />,
-      existing: initialFacebook,
+      existing: existingFacebook,
       file: facebookFile,
       setFile: setFacebookFile,
       value: facebookValue,
@@ -136,7 +151,7 @@ export default function EvidenceUploadCard({
       key: "youtube",
       label: "YouTube",
       icon: <YouTubeIcon color="error" />,
-      existing: initialYoutube,
+      existing: existingYoutube,
       file: youtubeFile,
       setFile: setYoutubeFile,
       value: youtubeValue,
@@ -146,7 +161,7 @@ export default function EvidenceUploadCard({
       key: "whatsapp",
       label: "WhatsApp",
       icon: <WhatsAppIcon sx={{ color: "#16a34a" }} />,
-      existing: initialWhatsapp,
+      existing: existingWhatsapp,
       file: whatsappFile,
       setFile: setWhatsappFile,
       value: whatsappValue,
@@ -185,10 +200,9 @@ export default function EvidenceUploadCard({
                     <Typography sx={{ fontWeight: 900 }}>{item.label}</Typography>
                   </Stack>
 
-                  {/* 🖼️ Imagen actual protegida */}
                   <ProtectedImage
                     filePath={item.existing?.imagePath}
-                    alt={`${item.label} evidencia`}
+                    alt={`${item.label} evidencia fase ${phase}`}
                     height={220}
                   />
 
@@ -241,11 +255,13 @@ export default function EvidenceUploadCard({
             <Button
               variant="contained"
               startIcon={<SaveIcon />}
-              disabled={!canSave}
+              disabled={loading}
               onClick={handleSave}
               sx={{ borderRadius: 2 }}
             >
-              {loading ? "Guardando Fase 2... ⏳" : "Guardar Fase 2 📤"}
+              {loading
+                ? `Guardando Fase ${phase}... ⏳`
+                : `Guardar Fase ${phase} 📤`}
             </Button>
           </Stack>
         </Stack>

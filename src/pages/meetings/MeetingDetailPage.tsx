@@ -1,31 +1,34 @@
 // src/pages/meetings/MeetingDetailPage.tsx
-/**
- * 🧠 MeetingDetailPage
- * -----------------------------------------
- * Pantalla central del flujo:
- * - Muestra resumen de la reunión
- * - Stepper de fases 🧭
- * - Secciones: F2, F3, F4, F5, F6
- *
- * Nota: Fase 1 ya se hizo en Create, aquí mostramos el resumen.
- */
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Box, Button, Card, CardContent, Divider, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Stack,
+  Typography,
+} from "@mui/material";
+
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 
+import { toast } from "react-toastify";
+
 import PageHeader from "../../components/ui/PageHeader";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import MeetingStepper from "../../components/meetings/MeetingStepper";
 import EvidenceUploadCard from "../../components/evidence/EvidenceUploadCard";
+import AttendancePhaseSection from "../../components/attendance/AttendancePhaseSection";
 import PhotoGroupCapture from "../../components/evidence/PhotoGroupCapture";
 import EvidenceComparePanel from "../../components/evidence/EvidenceComparePanel";
 
 import type { Meeting } from "../../models/meeting";
-import { getMeeting, setPhaseStatus } from "../../services/meetings.service";
+import { getMeeting } from "../../services/meetings.service";
+import { finalizePhase6 } from "../../services/evidence.service";
 import { formatDateShort } from "../../utils/format";
-import AttendancePhaseSection from "../../components/attendance/AttendancePhaseSection";
 
 export default function MeetingDetailPage() {
   const navigate = useNavigate();
@@ -35,11 +38,16 @@ export default function MeetingDetailPage() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [confirmFinalOpen, setConfirmFinalOpen] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+
   async function load() {
     if (!meetingId) return;
+
     try {
       setLoading(true);
       setErrorMsg(null);
+
       const data = await getMeeting(meetingId);
       setMeeting(data);
     } catch (err: any) {
@@ -50,8 +58,7 @@ export default function MeetingDetailPage() {
   }
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void load();
   }, [meetingId]);
 
   const actions = (
@@ -67,19 +74,26 @@ export default function MeetingDetailPage() {
 
   const summary = useMemo(() => {
     if (!meeting) return null;
+
     return (
       <Card>
         <CardContent>
           <Stack spacing={1}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between">
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+            >
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 900 }}>
                   {meeting.core.type} · {meeting.core.sede}
                 </Typography>
+
                 <Typography variant="body2" color="text.secondary">
-                  📅 {formatDateShort(meeting.core.dateISO)} · 📍 {meeting.core.municipio} · Sección{" "}
-                  <strong>{meeting.core.seccion}</strong>
+                  📅 {formatDateShort(meeting.core.dateISO)} · 📍 {meeting.core.municipio} ·
+                  Sección <strong>{meeting.core.seccion}</strong>
                 </Typography>
+
                 <Typography variant="body2" color="text.secondary">
                   👤 Organizador: <strong>{meeting.core.organizer.name}</strong> · Enlace:{" "}
                   <strong>{meeting.core.enlace.name}</strong>
@@ -97,8 +111,9 @@ export default function MeetingDetailPage() {
               >
                 <Stack direction="row" spacing={1} alignItems="center">
                   <QrCode2Icon color="primary" />
-                  <Typography sx={{ fontWeight: 900 }}>QR (valor)</Typography>
+                  <Typography sx={{ fontWeight: 900 }}>LLave / QR</Typography>
                 </Stack>
+
                 <Typography
                   variant="caption"
                   sx={{
@@ -121,13 +136,21 @@ export default function MeetingDetailPage() {
     );
   }, [meeting]);
 
-  const markPhaseCompleted = async (phase: any) => {
+  const handleFinalizePhase6 = async () => {
     if (!meeting) return;
+
     try {
-      const updated = await setPhaseStatus(meeting.id, phase, "COMPLETADA");
+      setFinalizing(true);
+
+      const updated = await finalizePhase6(meeting.id);
       setMeeting(updated);
+      setConfirmFinalOpen(false);
+
+      toast.success("✅ Agenda finalizada correctamente");
     } catch (err: any) {
-      alert(err?.message || "No se pudo actualizar fase ❌");
+      toast.error(err?.message || "❌ No se pudo finalizar la agenda");
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -158,9 +181,9 @@ export default function MeetingDetailPage() {
         {/* 📸 Fase 2 */}
         <EvidenceUploadCard
           meeting={meeting}
-          type="INICIAL_DIGITAL"
+          phase={2}
           title="Fase 2 · Evidencia Inicial Digital"
-          description="Sube 1 captura de YouTube + 1 captura de Facebook (estado inicial)."
+          description="Sube o reemplaza Facebook, YouTube y WhatsApp con sus valores actuales."
           onUpdated={(m) => setMeeting(m)}
         />
 
@@ -173,27 +196,32 @@ export default function MeetingDetailPage() {
         {/* 📸 Fase 5 */}
         <EvidenceUploadCard
           meeting={meeting}
-          type="FINAL_DIGITAL"
+          phase={5}
           title="Fase 5 · Evidencia Final Digital"
-          description="Sube 1 captura de YouTube + 1 captura de Facebook (estado final)."
+          description="Sube o reemplaza Facebook, YouTube y WhatsApp finales con sus valores actuales."
           onUpdated={(m) => setMeeting(m)}
         />
 
         {/* 🧪 Fase 6 */}
         <EvidenceComparePanel meeting={meeting} />
 
-        {/* ✅ Botón opcional para “cerrar” fase 6 cuando API exista */}
+        {/* ✅ Cierre */}
         <Card>
           <CardContent>
             <Typography sx={{ fontWeight: 900 }}>Cierre / Auditoría ✅</Typography>
             <Typography variant="body2" color="text.secondary">
-              Cuando exista API, aquí se podrá “cerrar” la reunión y generar métricas finales.
+              Cuando estés seguro de la comparación y evidencias, puedes finalizar la agenda.
             </Typography>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2 }} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              sx={{ mt: 2 }}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="outlined"
-                onClick={() => markPhaseCompleted(6)}
+                onClick={() => setConfirmFinalOpen(true)}
                 sx={{ borderRadius: 2 }}
               >
                 Marcar Fase 6 como completada ✅
@@ -202,6 +230,16 @@ export default function MeetingDetailPage() {
           </CardContent>
         </Card>
       </Stack>
+
+      <ConfirmDialog
+        open={confirmFinalOpen}
+        title="Finalizar agenda"
+        description="¿Deseas marcar la Fase 6 como completada y finalizar esta agenda? ✅"
+        confirmText={finalizing ? "Finalizando... ⏳" : "Sí, finalizar ✅"}
+        cancelText="Cancelar"
+        onConfirm={handleFinalizePhase6}
+        onClose={() => (finalizing ? null : setConfirmFinalOpen(false))}
+      />
     </Box>
   );
 }

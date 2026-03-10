@@ -1,10 +1,14 @@
 // src/components/evidence/EvidenceComparePanel.tsx
 /**
- * 🧪 EvidenceComparePanel (Fase 6)
+ * 🧪 EvidenceComparePanel (FASE 6)
  * -----------------------------------------
- * - Comparación Inicial vs Final (YT/FB)
- * - Incluye Foto Grupal
- * - Se ve claro y “audit-friendly” ✅
+ * Compara:
+ * - Inicial: FB / YT / WA
+ * - Final:   FB / YT / WA
+ * - Foto grupal
+ *
+ * Si no hay imagen:
+ * - muestra placeholder amigable
  */
 
 import React, { useMemo } from "react";
@@ -12,24 +16,58 @@ import { Box, Card, CardContent, Divider, Grid, Stack, Typography } from "@mui/m
 import CompareIcon from "@mui/icons-material/Compare";
 
 import type { Meeting } from "../../models/meeting";
+import ProtectedImage from "./ProtectedImage";
 
 type Props = {
   meeting: Meeting;
 };
 
-function getEvidence(meeting: Meeting, type: any, platform: any) {
+function findEvidence(meeting: Meeting, type: "INICIAL_DIGITAL" | "FINAL_DIGITAL", platform: "FB" | "YT" | "WA") {
   return meeting.evidences.find((e) => e.type === type && e.platform === platform);
 }
 
 export default function EvidenceComparePanel({ meeting }: Props) {
-  const initialYT = useMemo(() => getEvidence(meeting, "INICIAL_DIGITAL", "YT"), [meeting]);
-  const initialFB = useMemo(() => getEvidence(meeting, "INICIAL_DIGITAL", "FB"), [meeting]);
-  const finalYT = useMemo(() => getEvidence(meeting, "FINAL_DIGITAL", "YT"), [meeting]);
-  const finalFB = useMemo(() => getEvidence(meeting, "FINAL_DIGITAL", "FB"), [meeting]);
-  const groupPhoto = useMemo(() => meeting.evidences.find((e) => e.type === "FOTO_GRUPAL"), [meeting]);
+  const initialFB = useMemo(() => findEvidence(meeting, "INICIAL_DIGITAL", "FB"), [meeting]);
+  const initialYT = useMemo(() => findEvidence(meeting, "INICIAL_DIGITAL", "YT"), [meeting]);
+  const initialWA = useMemo(() => findEvidence(meeting, "INICIAL_DIGITAL", "WA"), [meeting]);
 
-  const ready =
-    Boolean(initialYT && initialFB && finalYT && finalFB && groupPhoto);
+  const finalFB = useMemo(() => findEvidence(meeting, "FINAL_DIGITAL", "FB"), [meeting]);
+  const finalYT = useMemo(() => findEvidence(meeting, "FINAL_DIGITAL", "YT"), [meeting]);
+  const finalWA = useMemo(() => findEvidence(meeting, "FINAL_DIGITAL", "WA"), [meeting]);
+
+  const groupPhoto = useMemo(
+    () => meeting.evidences.find((e) => e.type === "FOTO_GRUPAL"),
+    [meeting]
+  );
+
+  const ready = Boolean(
+    initialFB || initialYT || initialWA || finalFB || finalYT || finalWA || groupPhoto
+  );
+
+  const renderCard = (
+    label: string,
+    filePath?: string | null,
+    value?: number | null
+  ) => (
+    <Box
+      sx={{
+        p: 1,
+        borderRadius: 2,
+        border: "1px solid rgba(0,0,0,0.08)",
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography sx={{ fontWeight: 900, mb: 0.8 }}>{label}</Typography>
+
+      <ProtectedImage filePath={filePath} alt={label} height={180} />
+
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.8, display: "block" }}>
+        {value !== undefined && value !== null
+          ? `Valor capturado: ${value}`
+          : "Aún no hay valor registrado"}
+      </Typography>
+    </Box>
+  );
 
   return (
     <Card>
@@ -43,7 +81,7 @@ export default function EvidenceComparePanel({ meeting }: Props) {
           </Stack>
 
           <Typography variant="body2" color="text.secondary">
-            Compara evidencia inicial vs final (YouTube/Facebook) y confirma foto grupal.
+            Compara evidencias iniciales y finales, además de la fotografía grupal.
           </Typography>
 
           <Divider sx={{ my: 1 }} />
@@ -57,54 +95,55 @@ export default function EvidenceComparePanel({ meeting }: Props) {
                 border: "1px solid rgba(245,158,11,0.30)",
               }}
             >
-              <Typography sx={{ fontWeight: 900 }}>Aún no está listo ⚠️</Typography>
+              <Typography sx={{ fontWeight: 900 }}>Aún no hay suficientes evidencias ⚠️</Typography>
               <Typography variant="body2" color="text.secondary">
-                Requisito: Inicial (YT+FB) + Final (YT+FB) + Foto grupal.
+                Se mostrarán aquí conforme se vayan capturando.
               </Typography>
             </Box>
           ) : null}
 
-          {/* 🧾 Comparación Digital */}
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={6}>
-              <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Inicial 📸</Typography>
-
-              <Typography variant="caption" color="text.secondary">YouTube</Typography>
-              <Box className="evidence-preview" sx={{ mb: 1 }}>
-                {initialYT ? <img src={initialYT.imageUrl} alt="Inicial YT" /> : <Box sx={{ p: 2 }}>Falta YT 🫙</Box>}
-              </Box>
-
-              <Typography variant="caption" color="text.secondary">Facebook</Typography>
-              <Box className="evidence-preview">
-                {initialFB ? <img src={initialFB.imageUrl} alt="Inicial FB" /> : <Box sx={{ p: 2 }}>Falta FB 🫙</Box>}
-              </Box>
+          <Grid container spacing={2}>
+            {/* Inicial */}
+            <Grid item xs={12} lg={6}>
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Inicial 📸</Typography>
+              <Stack spacing={1}>
+                {renderCard("Facebook inicial 📘", initialFB?.imagePath, initialFB?.value)}
+                {renderCard("YouTube inicial ▶️", initialYT?.imagePath, initialYT?.value)}
+                {renderCard("WhatsApp inicial 💬", initialWA?.imagePath, initialWA?.value)}
+              </Stack>
             </Grid>
 
-            <Grid item xs={12} md={6}>
-              <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Final 📸</Typography>
+            {/* Final */}
+            <Grid item xs={12} lg={6}>
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Final 📸</Typography>
+              <Stack spacing={1}>
+                {renderCard("Facebook final 📘", finalFB?.imagePath, finalFB?.value)}
+                {renderCard("YouTube final ▶️", finalYT?.imagePath, finalYT?.value)}
+                {renderCard("WhatsApp final 💬", finalWA?.imagePath, finalWA?.value)}
+              </Stack>
+            </Grid>
 
-              <Typography variant="caption" color="text.secondary">YouTube</Typography>
-              <Box className="evidence-preview" sx={{ mb: 1 }}>
-                {finalYT ? <img src={finalYT.imageUrl} alt="Final YT" /> : <Box sx={{ p: 2 }}>Falta YT 🫙</Box>}
-              </Box>
+            {/* Foto grupal */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 1 }} />
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Fotografía grupal 📸</Typography>
 
-              <Typography variant="caption" color="text.secondary">Facebook</Typography>
-              <Box className="evidence-preview">
-                {finalFB ? <img src={finalFB.imageUrl} alt="Final FB" /> : <Box sx={{ p: 2 }}>Falta FB 🫙</Box>}
+              <Box
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  bgcolor: "#fff",
+                }}
+              >
+                <ProtectedImage
+                  filePath={groupPhoto?.imagePath}
+                  alt="Fotografía grupal"
+                  height={280}
+                />
               </Box>
             </Grid>
           </Grid>
-
-          {/* 📷 Foto grupal */}
-          <Divider sx={{ my: 2 }} />
-          <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Foto grupal 📷</Typography>
-          <Box className="evidence-preview">
-            {groupPhoto ? (
-              <img src={groupPhoto.imageUrl} alt="Foto grupal" />
-            ) : (
-              <Box sx={{ p: 2 }}>Falta foto grupal 🫙</Box>
-            )}
-          </Box>
         </Stack>
       </CardContent>
     </Card>
