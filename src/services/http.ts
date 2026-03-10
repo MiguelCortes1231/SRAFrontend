@@ -1,52 +1,148 @@
 // src/services/http.ts
 /**
- * 🌐 Axios base
- * -----------------------------------------
- * - Usa JWT automáticamente
- * - Si expira la sesión, limpia storage
+ * 🌐 HTTP Client robusto
+ * ---------------------------------------------------
+ * ✅ Authorization Bearer
+ * ✅ Cola global para GET
+ * ✅ Retry automático para 429
+ * ✅ Respeta Retry-After
  */
-
 import axios from "axios";
-import {
-  clearSession,
-  getToken,
-  getTokenType,
-  isAuthenticated,
-} from "../store/auth.store";
+import type {
+  AxiosError,
+  AxiosHeaders,
+  AxiosInstance,
+  AxiosRequestConfig,
+  InternalAxiosRequestConfig,
+} from "axios";
+
+import { clearSession, getToken, getTokenType } from "../store/auth.store";
+import { getRequestScheduler } from "../utils/requestScheduler";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://servdes1.proyectoqroo.com.mx/gsv/ibeta/api";
 
-export const http = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  },
-});
+type ExtendedConfig = InternalAxiosRequestConfig & {
+  __skipGetQueue?: boolean;
+  __retryCount?: number;
+};
 
-/** 🛡️ Request interceptor */
-http.interceptors.request.use((config) => {
-  const token = getToken();
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (token && isAuthenticated()) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `${getTokenType()} ${token}`;
+function randomBetween(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function parseRetryAfter(value?: string | null): number | null {
+  if (!value) return null;
+
+  const asNumber = Number(value);
+  if (!Number.isNaN(asNumber)) {
+    return asNumber * 1000; // header en segundos
   }
 
-  return config;
+  const asDate = new Date(value).getTime();
+  if (!Number.isNaN(asDate)) {
+    const diff = asDate - Date.now();
+    return diff > 0 ? diff : null;
+  }
+
+  return null;
+}
+
+const instance: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 60000,
 });
 
-/** 🚨 Response interceptor */
-http.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // 🔒 Si backend responde no autorizado
-    if (error?.response?.status === 401) {
-      clearSession();
+/* =========================================================
+ * 🔐 Request interceptor
+ * ========================================================= */
+instance.interceptors.request.use(
+  async (config: ExtendedConfig) => {
+    const token = getToken();
+    const tokenType = getTokenType();
+
+    if (!config.headers) {
+      config.headers = new AxiosHeaders();
     }
+
+    if (token) {
+      config.headers.set("Authorization", `${tokenType} ${token}`);
+    }
+
+    const method = String(config.method || "get").toLowerCase();
+
+    // ✅ Solo en GET aplicamos la cola
+    if (method === "get" && !config.__skipGetQueue) {
+      await getRequestScheduler.enqueue(async () => config);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+/* =========================================================
+ * 🚨 Response interceptor
+ * ========================================================= */
+instance.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const response = error.response;
+    const config = error.config as ExtendedConfig | undefined;
+
+    if (response?.status === 401) {
+      clearSession();
+      return Promise.reject(error);
+    }
+
+    // 🔥 Retry automático solo para GET y solo en 429
+    const isGet = String(config?.method || "get").toLowerCase() === "get";
+    const canRetry = isGet && response?.status === 429 && config;
+
+    if (canRetry) {
+      config.__retryCount = config.__retryCount ?? 0;
+
+      // máximo 2 reintentos
+      if (config.__retryCount < 2) {
+        config.__retryCount += 1;
+
+        const retryAfterHeader = response?.headers?.["retry-after"];
+        const retryAfterMs = parseRetryAfter(
+          Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : retryAfterHeader
+        );
+
+        // si backend manda Retry-After lo respetamos
+        const waitMs =
+          retryAfterMs ??
+          randomBetween(2500, 4500) * config.__retryCount;
+
+        await sleep(waitMs);
+
+        return instance.request(config);
+      }
+    }
+
     return Promise.reject(error);
   }
 );
+
+export const http = instance;
+
+/**
+ * ⚡ GET inmediato sin cola
+ * Solo si un caso especial lo necesita
+ */
+export async function httpGetImmediate<T = unknown>(
+  url: string,
+  config?: AxiosRequestConfig
+) {
+  return instance.get<T>(url, {
+    ...(config || {}),
+    __skipGetQueue: true,
+  } as ExtendedConfig);
+}

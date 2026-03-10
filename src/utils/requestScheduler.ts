@@ -1,24 +1,17 @@
 // src/utils/requestScheduler.ts
 /**
- * ⏳ Request Scheduler
+ * ⏳ Cola global para GET
  * ---------------------------------------------------
- * Sirve para evitar que muchos GET salgan de golpe.
+ * Evita que salgan muchos GET al mismo tiempo.
  *
- * ✅ Qué hace:
- * - Cola secuencial para GET
- * - Espera aleatoria entre requests
- * - Control de concurrencia
- *
- * 🎯 Caso de uso:
- * - imágenes protegidas
- * - detalles de agenda
- * - cualquier GET que pueda saturar backend
+ * ✅ maxConcurrent = 1
+ * ✅ delay aleatorio entre requests
  */
 
 type QueueTask<T> = {
+  job: () => Promise<T>;
   resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: unknown) => void;
-  job: () => Promise<T>;
 };
 
 function sleep(ms: number) {
@@ -33,21 +26,16 @@ class RequestScheduler {
   private queue: QueueTask<unknown>[] = [];
   private running = 0;
 
-  // 🔧 Puedes cambiar esto si luego quieres 2 paralelas
+  // 🔥 1 sola request GET a la vez
   private readonly maxConcurrent = 1;
 
-  // ⏱️ Delay aleatorio entre GETs
+  // ⏱️ espera aleatoria entre 1000 y 2000 ms
   private readonly minDelayMs = 1000;
   private readonly maxDelayMs = 2000;
 
   enqueue<T>(job: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      this.queue.push({
-        resolve,
-        reject,
-        job,
-      });
-
+      this.queue.push({ job, resolve, reject });
       this.runNext();
     });
   }
@@ -62,7 +50,6 @@ class RequestScheduler {
     this.running += 1;
 
     try {
-      // 💤 Espera aleatoria antes de disparar el GET
       const waitMs = randomBetween(this.minDelayMs, this.maxDelayMs);
       await sleep(waitMs);
 
@@ -77,5 +64,4 @@ class RequestScheduler {
   }
 }
 
-// 🌍 Instancia global compartida
 export const getRequestScheduler = new RequestScheduler();
