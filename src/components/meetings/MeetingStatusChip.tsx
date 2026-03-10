@@ -2,44 +2,60 @@
 /**
  * 🏷️ MeetingStatusChip
  * -----------------------------------------
- * Chip visual para estado general de la reunión:
- * - BORRADOR 🟦
- * - EN_PROCESO 🟡
- * - COMPLETADA 🟢
- * - OBSERVADA 🟠
+ * Mapea el estatus interno del frontend a una etiqueta bonita.
+ *
+ * ✅ Cambio importante:
+ * - OBSERVADA ahora se muestra como "Cancelada 🚫"
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { Chip } from "@mui/material";
 import type { MeetingStatus } from "../../models/meeting";
 
 type Props = {
   status: MeetingStatus;
-  size?: "small" | "medium";
 };
 
-export default function MeetingStatusChip({ status, size = "small" }: Props) {
-  const cfg = useMemo(() => {
-    switch (status) {
-      case "COMPLETADA":
-        return { label: "Completada ✅", color: "success" as const, variant: "filled" as const };
-      case "OBSERVADA":
-        return { label: "Observada ⚠️", color: "warning" as const, variant: "filled" as const };
-      case "EN_PROCESO":
-        return { label: "En proceso 🧭", color: "primary" as const, variant: "outlined" as const };
-      case "BORRADOR":
-      default:
-        return { label: "Borrador ✍️", color: "default" as const, variant: "outlined" as const };
-    }
-  }, [status]);
+export default function MeetingStatusChip({ status }: Props) {
+  if (status === "COMPLETADA") {
+    return (
+      <Chip
+        size="small"
+        label="Completada ✅"
+        color="success"
+        variant="outlined"
+      />
+    );
+  }
+
+  if (status === "EN_PROCESO") {
+    return (
+      <Chip
+        size="small"
+        label="En proceso 🧭"
+        color="primary"
+        variant="outlined"
+      />
+    );
+  }
+
+  if (status === "OBSERVADA") {
+    return (
+      <Chip
+        size="small"
+        label="Cancelada 🚫"
+        color="error"
+        variant="outlined"
+      />
+    );
+  }
 
   return (
     <Chip
-      size={size}
-      label={cfg.label}
-      color={cfg.color}
-      variant={cfg.variant}
-      sx={{ fontWeight: 800 }}
+      size="small"
+      label="Borrador ✍️"
+      color="default"
+      variant="outlined"
     />
   );
 }

@@ -1,8 +1,6 @@
 // src/services/auth.service.ts
 /**
  * 🔁 Auth Service
- * -----------------------------------------
- * Login real contra API JWT
  */
 
 import { http } from "./http";
@@ -15,7 +13,7 @@ export type LoginPayload = {
 
 type LoginApiResponse = {
   token: string;
-  type: string; // "Bearer"
+  type: string;
   expires_in: number;
   user: {
     id: number;
@@ -24,7 +22,6 @@ type LoginApiResponse = {
   };
 };
 
-/** 🔐 Login real */
 export async function login(payload: LoginPayload) {
   const res = await http.post<LoginApiResponse>("/loginjwt", {
     username: payload.username,
@@ -49,7 +46,6 @@ export async function login(payload: LoginPayload) {
   return data;
 }
 
-/** 🚪 Logout */
 export function logout() {
   clearSession();
 }

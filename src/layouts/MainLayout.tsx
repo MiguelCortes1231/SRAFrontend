@@ -1,9 +1,4 @@
 // src/layouts/MainLayout.tsx
-/**
- * 🧱 Layout principal
- * Solo te dejo completo para evitar choques
- */
-
 import React, { useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
@@ -30,6 +25,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { logout } from "../services/auth.service";
 import { getUser } from "../store/auth.store";
 
@@ -41,6 +37,8 @@ export default function MainLayout() {
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+
   const user = getUser();
 
   const menuItems = useMemo(
@@ -114,7 +112,7 @@ export default function MainLayout() {
           fullWidth
           variant="outlined"
           startIcon={<LogoutIcon />}
-          onClick={handleLogout}
+          onClick={() => setConfirmLogoutOpen(true)}
           sx={{ borderRadius: 2 }}
         >
           Cerrar sesión
@@ -197,6 +195,16 @@ export default function MainLayout() {
           </div>
         </Box>
       </Box>
+
+      <ConfirmDialog
+        open={confirmLogoutOpen}
+        title="Cerrar sesión"
+        description="¿Deseas cerrar sesión? Se limpiará el localStorage de la sesión actual. 🔐"
+        confirmText="Sí, cerrar sesión 🚪"
+        cancelText="Cancelar"
+        onConfirm={handleLogout}
+        onClose={() => setConfirmLogoutOpen(false)}
+      />
     </Box>
   );
 }

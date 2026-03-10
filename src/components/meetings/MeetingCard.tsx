@@ -14,7 +14,7 @@ import {
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ImageIcon from "@mui/icons-material/Image";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CancelIcon from "@mui/icons-material/Cancel";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import EditIcon from "@mui/icons-material/Edit";
 
@@ -26,10 +26,10 @@ type Props = {
   meeting: Meeting;
   onOpen: (id: string) => void;
   onEdit: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onCancel?: (id: string) => void;
 };
 
-export default function MeetingCard({ meeting, onOpen, onEdit, onDelete }: Props) {
+export default function MeetingCard({ meeting, onOpen, onEdit, onCancel }: Props) {
   return (
     <Card
       sx={{
@@ -94,15 +94,15 @@ export default function MeetingCard({ meeting, onOpen, onEdit, onDelete }: Props
           sx={{ mt: 2 }}
           justifyContent="flex-end"
         >
-          {onDelete ? (
+          {onCancel ? (
             <Button
               variant="outlined"
               color="error"
-              startIcon={<DeleteOutlineIcon />}
-              onClick={() => onDelete(meeting.id)}
+              startIcon={<CancelIcon />}
+              onClick={() => onCancel(meeting.id)}
               sx={{ borderRadius: 2 }}
             >
-              Eliminar
+              Cancelar
             </Button>
           ) : null}
 

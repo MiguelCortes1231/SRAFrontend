@@ -1,6 +1,6 @@
 // src/services/meetings.service.ts
 /**
- * 🔁 Meetings Service (HÍBRIDO)
+ * 🔁 Meetings Service (REAL + HÍBRIDO)
  * -----------------------------------------
  * ✅ REAL API:
  * - listMeetings()
@@ -8,12 +8,12 @@
  * - getMeeting()
  * - createMeeting()
  * - updateMeeting()
+ * - cancelMeeting()
  *
  * 🧪 MOCK temporal:
  * - setPhaseStatus()
  * - addAdultAttendance()
  * - addMinorAttendance()
- * - deleteMeeting()
  */
 
 import { http } from "./http";
@@ -35,7 +35,6 @@ import { buildQrValue } from "../utils/id";
 import {
   mockAddAdultAttendance,
   mockAddMinorAttendance,
-  mockDeleteMeeting,
   mockSetPhaseStatus,
 } from "../mocks/meetings.mock";
 import { loadDB, saveDB } from "../mocks/db";
@@ -67,6 +66,15 @@ type UpdateAgendaResponse = {
   success: boolean;
   message: string;
   data?: unknown;
+};
+
+type CancelAgendaResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    IdAgenda: number;
+    Estado: number;
+  };
 };
 
 type AgendaApiRow = {
@@ -122,15 +130,59 @@ function idReunionToMeetingType(idReunion: number): MeetingType {
   return Number(idReunion) === 1 ? "ASAMBLEA" : "EVENTO";
 }
 
-/** 🧭 Backend fase -> flow */
-function phaseNumberToFlow(fase: number): MeetingFlow {
+/**
+ * 🧠 Flow real desde getAgenda
+ * -----------------------------------------
+ * Regla:
+ * - Fase 1: existe agenda
+ * - Fase 2: si hay al menos una evidencia inicial o si backend ya va >=2
+ * - Fase 3: si backend va >=3 (aún no viene conteo aquí)
+ * - Fase 4: si hay FotoGrupal o backend ya va >=4
+ * - Fase 5: si hay al menos una evidencia final o si backend ya va >=5
+ * - Fase 6: si Estado=3 o backend ya va >=6
+ *
+ * Estado:
+ * - 3 = finalizada ✅
+ * - 4 = cancelada 🚫
+ */
+function buildFlowFromAgenda(row: AgendaApiRow): MeetingFlow {
+  const hasInitial =
+    Boolean(row.Facebook1) || Boolean(row.Youtube1) || Boolean(row.Whatsapp1);
+
+  const hasFinal =
+    Boolean(row.Facebook2) || Boolean(row.Youtube2) || Boolean(row.Whatsapp2);
+
+  const hasGroupPhoto = Boolean(row.FotoGrupal);
+
+  if (Number(row.Estado) === 3) {
+    return {
+      1: "COMPLETADA",
+      2: "COMPLETADA",
+      3: "COMPLETADA",
+      4: "COMPLETADA",
+      5: "COMPLETADA",
+      6: "COMPLETADA",
+    };
+  }
+
+  if (Number(row.Estado) === 4) {
+    return {
+      1: "OBSERVADA",
+      2: hasInitial ? "COMPLETADA" : "PENDIENTE",
+      3: Number(row.Fase) >= 3 ? "COMPLETADA" : "PENDIENTE",
+      4: hasGroupPhoto ? "COMPLETADA" : "PENDIENTE",
+      5: hasFinal ? "COMPLETADA" : "PENDIENTE",
+      6: "OBSERVADA",
+    };
+  }
+
   return {
-    1: fase >= 1 ? "COMPLETADA" : "PENDIENTE",
-    2: fase >= 2 ? "COMPLETADA" : "PENDIENTE",
-    3: fase >= 3 ? "COMPLETADA" : "PENDIENTE",
-    4: fase >= 4 ? "COMPLETADA" : "PENDIENTE",
-    5: fase >= 5 ? "COMPLETADA" : "PENDIENTE",
-    6: fase >= 6 ? "COMPLETADA" : "PENDIENTE",
+    1: "COMPLETADA",
+    2: hasInitial || Number(row.Fase) >= 2 ? "COMPLETADA" : "PENDIENTE",
+    3: Number(row.Fase) >= 3 ? "COMPLETADA" : "PENDIENTE",
+    4: hasGroupPhoto || Number(row.Fase) >= 4 ? "COMPLETADA" : "PENDIENTE",
+    5: hasFinal || Number(row.Fase) >= 5 ? "COMPLETADA" : "PENDIENTE",
+    6: Number(row.Fase) >= 6 ? "COMPLETADA" : "PENDIENTE",
   };
 }
 
@@ -146,7 +198,7 @@ function upsertMeetingToMock(meeting: Meeting) {
 
 async function mapAgendaRowToMeeting(row: AgendaApiRow): Promise<Meeting> {
   const section = await findSectionById(row.IdSeccion);
-  const flow = phaseNumberToFlow(Number(row.Fase || 1));
+  const flow = buildFlowFromAgenda(row);
 
   const evidences: Meeting["evidences"] = [
     row.Youtube1
@@ -370,7 +422,6 @@ export async function createMeeting(core: MeetingCore): Promise<Meeting> {
   return mapped;
 }
 
-/** ✏️ Editar agenda real */
 export async function updateMeeting(meetingId: string, core: MeetingCore): Promise<Meeting> {
   const payload = {
     IdReunion: meetingTypeToIdReunion(core.type),
@@ -386,7 +437,17 @@ export async function updateMeeting(meetingId: string, core: MeetingCore): Promi
 
   await http.put<UpdateAgendaResponse>(`/updateAgenda/${meetingId}`, payload);
 
-  // ✅ después de editar, traemos la agenda real actualizada
+  const updated = await getMeeting(meetingId);
+  upsertMeetingToMock(updated);
+  return updated;
+}
+
+/** 🚫 Cancelar agenda */
+export async function cancelMeeting(meetingId: string): Promise<Meeting> {
+  await http.post<CancelAgendaResponse>(`/cancelarAgenda/${meetingId}`, null, {
+    headers: { accept: "application/json" },
+  });
+
   const updated = await getMeeting(meetingId);
   upsertMeetingToMock(updated);
   return updated;
@@ -416,8 +477,4 @@ export async function addMinorAttendance(
   payload: Omit<AttendanceMinor, "id" | "meetingId" | "createdAtISO">
 ): Promise<Meeting> {
   return mockAddMinorAttendance(meetingId, payload);
-}
-
-export async function deleteMeeting(meetingId: string): Promise<void> {
-  return mockDeleteMeeting(meetingId);
 }

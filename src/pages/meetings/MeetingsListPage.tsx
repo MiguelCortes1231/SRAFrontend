@@ -18,6 +18,8 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
+import { toast } from "react-toastify";
+
 import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
@@ -25,7 +27,7 @@ import MeetingCard from "../../components/meetings/MeetingCard";
 
 import type { Meeting, MeetingStatus, MeetingType } from "../../models/meeting";
 import {
-  deleteMeeting,
+  cancelMeeting,
   listMeetings,
   listMeetingsByDate,
 } from "../../services/meetings.service";
@@ -35,14 +37,6 @@ type TypeFilter = "ALL" | MeetingType;
 
 const PAGE_SIZE = 8;
 
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 export default function MeetingsListPage() {
   const navigate = useNavigate();
 
@@ -50,18 +44,15 @@ export default function MeetingsListPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 🔎 filtros
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [dateFilter, setDateFilter] = useState("");
 
-  // 📄 paginación
   const [page, setPage] = useState(1);
 
-  // 🗑️ delete
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState(false);
 
   async function load() {
     try {
@@ -84,7 +75,6 @@ export default function MeetingsListPage() {
     void load();
   }, [dateFilter]);
 
-  // 🔎 filtro local adicional
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -111,7 +101,6 @@ export default function MeetingsListPage() {
     });
   }, [meetings, query, statusFilter, typeFilter]);
 
-  // 🔢 paginación
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
   const paginatedMeetings = useMemo(() => {
@@ -138,7 +127,7 @@ export default function MeetingsListPage() {
 
   const handleOpen = (id: string) => navigate(`/meetings/${id}`);
   const handleEdit = (id: string) => navigate(`/meetings/${id}/edit`);
-  const handleAskDelete = (id: string) => setDeleteId(id);
+  const handleAskCancel = (id: string) => setCancelId(id);
 
   const handleResetFilters = () => {
     setQuery("");
@@ -148,18 +137,20 @@ export default function MeetingsListPage() {
     setPage(1);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteId) return;
+  const handleConfirmCancel = async () => {
+    if (!cancelId) return;
 
     try {
-      setDeleting(true);
-      await deleteMeeting(deleteId);
-      setDeleteId(null);
+      setCanceling(true);
+      await cancelMeeting(cancelId);
+      setCancelId(null);
       await load();
+      toast.success("✅ Agenda cancelada correctamente");
     } catch (err: any) {
-      setErrorMsg(err?.message || "No se pudo eliminar la reunión ❌");
+      setErrorMsg(err?.message || "No se pudo cancelar la agenda ❌");
+      toast.error(err?.message || "❌ No se pudo cancelar la agenda");
     } finally {
-      setDeleting(false);
+      setCanceling(false);
     }
   };
 
@@ -167,7 +158,7 @@ export default function MeetingsListPage() {
     <Box>
       <PageHeader
         title="Reuniones"
-        subtitle="Consulta, filtra, edita y navega tus reuniones 📋"
+        subtitle="Consulta, filtra, edita y cancela agendas 📋"
         actions={actions}
       />
 
@@ -177,8 +168,14 @@ export default function MeetingsListPage() {
         </Typography>
       ) : null}
 
-      {/* 🔎 filtros */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
+      <Grid
+  container
+  spacing={2}
+  sx={{
+    mb: 2,
+    alignItems: "stretch", // 🔥 fuerza misma altura
+  }}
+>
         <Grid item xs={12} md={4}>
           <TextField
             label="Buscar"
@@ -202,7 +199,7 @@ export default function MeetingsListPage() {
             <MenuItem value="BORRADOR">Borrador ✍️</MenuItem>
             <MenuItem value="EN_PROCESO">En proceso 🧭</MenuItem>
             <MenuItem value="COMPLETADA">Completada ✅</MenuItem>
-            <MenuItem value="OBSERVADA">Observada ⚠️</MenuItem>
+            <MenuItem value="OBSERVADA">Cancelada 🚫</MenuItem>
           </TextField>
         </Grid>
 
@@ -274,13 +271,12 @@ export default function MeetingsListPage() {
                       meeting={m}
                       onOpen={handleOpen}
                       onEdit={handleEdit}
-                      onDelete={handleAskDelete}
+                      onCancel={handleAskCancel}
                     />
                   </Grid>
                 ))}
               </Grid>
 
-              {/* 📄 paginación */}
               <Stack alignItems="center" sx={{ mt: 3 }}>
                 <Pagination
                   count={totalPages}
@@ -301,13 +297,13 @@ export default function MeetingsListPage() {
       ) : null}
 
       <ConfirmDialog
-        open={Boolean(deleteId)}
-        title="Eliminar reunión"
-        description="Esta acción eliminará la reunión. ¿Deseas continuar? 🗑️"
-        confirmText={deleting ? "Eliminando... ⏳" : "Sí, eliminar 🗑️"}
-        cancelText="Cancelar"
-        onConfirm={handleConfirmDelete}
-        onClose={() => (deleting ? null : setDeleteId(null))}
+        open={Boolean(cancelId)}
+        title="Cancelar agenda"
+        description="¿Deseas cancelar esta agenda? Esta acción la marcará como cancelada en el sistema. ⚠️"
+        confirmText={canceling ? "Cancelando... ⏳" : "Sí, cancelar agenda 🚫"}
+        cancelText="Cerrar"
+        onConfirm={handleConfirmCancel}
+        onClose={() => (canceling ? null : setCancelId(null))}
         danger
       />
     </Box>

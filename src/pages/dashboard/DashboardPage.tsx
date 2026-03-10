@@ -2,19 +2,15 @@
 /**
  * 🏠 DashboardPage
  * -----------------------------------------
- * ✅ Solo 3 KPIs:
+ * ✅ KPIs:
  * - Total de reuniones
  * - En proceso
  * - Completadas
+ * - Canceladas
  *
  * ✅ Todas las cards del mismo tamaño
- * ✅ Próximas reuniones:
- * - ordenadas por fecha más cercana al sistema
- * - máximo 20
- * - paginadas de 5
- *
- * ✅ Calendario:
- * - reuniones del día paginadas de 5
+ * ✅ Próximas reuniones paginadas
+ * ✅ Calendario con reuniones del día paginadas
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -38,6 +34,7 @@ import { listMeetings } from "../../services/meetings.service";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import CancelIcon from "@mui/icons-material/Cancel";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
@@ -90,16 +87,12 @@ export default function DashboardPage() {
     const total = meetings.length;
     const enProceso = meetings.filter((m) => m.status === "EN_PROCESO").length;
     const completadas = meetings.filter((m) => m.status === "COMPLETADA").length;
+    const canceladas = meetings.filter((m) => m.status === "OBSERVADA").length;
 
-    return { total, enProceso, completadas };
+    return { total, enProceso, completadas, canceladas };
   }, [meetings]);
 
-  /** 📅 Próximas reuniones:
-   * - primero reuniones de hoy o futuras
-   * - orden ascendente por fecha
-   * - máximo 20
-   * - si no hay futuras, usa las más cercanas pasadas
-   */
+  /** 📅 Próximas reuniones */
   const upcoming = useMemo(() => {
     const today = new Date();
     const todayStart = new Date(
@@ -192,9 +185,9 @@ export default function DashboardPage() {
         <Typography color="text.secondary">Cargando datos... ⏳</Typography>
       ) : null}
 
-      {/* 📊 KPI Cards del mismo tamaño */}
+      {/* 📊 KPI Cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6} xl={3}>
           <Box sx={{ height: "100%" }}>
             <StatCard
               label="Total de reuniones"
@@ -205,7 +198,7 @@ export default function DashboardPage() {
           </Box>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6} xl={3}>
           <Box sx={{ height: "100%" }}>
             <StatCard
               label="En proceso"
@@ -216,13 +209,24 @@ export default function DashboardPage() {
           </Box>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6} xl={3}>
           <Box sx={{ height: "100%" }}>
             <StatCard
               label="Completadas"
               value={kpis.completadas}
               icon={<CheckCircleIcon />}
               helperText="Reuniones finalizadas ✅"
+            />
+          </Box>
+        </Grid>
+
+        <Grid item xs={12} sm={6} xl={3}>
+          <Box sx={{ height: "100%" }}>
+            <StatCard
+              label="Canceladas"
+              value={kpis.canceladas}
+              icon={<CancelIcon />}
+              helperText="Agendas canceladas 🚫"
             />
           </Box>
         </Grid>
