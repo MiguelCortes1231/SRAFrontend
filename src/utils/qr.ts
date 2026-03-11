@@ -12,5 +12,5 @@ export function buildMeetingPreviewUrl(meetingId: string | number): string {
       ? window.location.origin
       : import.meta.env.VITE_APP_BASE_URL || "http://localhost:5173";
 
-  return `${origin}/meetings/${meetingId}/preview`;
+  return `${origin}/sra/meetings/${meetingId}/preview`;
 }
