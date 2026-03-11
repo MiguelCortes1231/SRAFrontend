@@ -1,4 +1,14 @@
 // src/pages/meetings/MeetingDetailPage.tsx
+/**
+ * 🧭 MeetingDetailPage
+ * ---------------------------------------------------
+ * ✅ Flujo por tabs estilo stepper
+ * ✅ Fase 1 con mapa bonito 🗺️
+ * ✅ Botón editar si la agenda sigue activa ✏️
+ * ✅ Icono Google Maps 🌍
+ * ✅ Solo lectura para completadas/canceladas 🔒
+ */
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -9,13 +19,18 @@ import {
   CardContent,
   Divider,
   Fade,
+  IconButton,
   Stack,
+  Tooltip,
   Typography,
+  Grid,
 } from "@mui/material";
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import MapIcon from "@mui/icons-material/Map";
 
 import { toast } from "react-toastify";
 
@@ -26,11 +41,13 @@ import EvidenceUploadCard from "../../components/evidence/EvidenceUploadCard";
 import AttendancePhaseSection from "../../components/attendance/AttendancePhaseSection";
 import PhotoGroupCapture from "../../components/evidence/PhotoGroupCapture";
 import EvidenceComparePanel from "../../components/evidence/EvidenceComparePanel";
+import ReadOnlyMeetingMap from "../../components/maps/ReadOnlyMeetingMap";
 
 import type { Meeting } from "../../models/meeting";
 import { getMeeting } from "../../services/meetings.service";
 import { finalizePhase6 } from "../../services/evidence.service";
 import { formatDateShort } from "../../utils/format";
+import { buildGoogleMapsPlaceUrl } from "../../utils/maps";
 
 function PhasePanel({
   active,
@@ -50,6 +67,41 @@ function PhasePanel({
         {children}
       </Box>
     </Fade>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      spacing={{ xs: 0.3, sm: 1 }}
+      sx={{ py: 0.3 }}
+    >
+      <Typography
+        sx={{
+          fontWeight: 900,
+          minWidth: { xs: "100%", sm: 150 },
+          color: "text.primary",
+        }}
+      >
+        {label}
+      </Typography>
+
+      <Typography
+        sx={{
+          color: "text.secondary",
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -92,10 +144,18 @@ export default function MeetingDetailPage() {
   const isCompleted = meeting?.status === "COMPLETADA";
   const isCancelled = meeting?.status === "OBSERVADA";
 
-  // 🔒 Solo lectura tanto para completadas como canceladas
+  // 🔒 Solo lectura para completadas y canceladas
   const isReadOnly = Boolean(isCompleted || isCancelled);
 
   const disableFinalize = isCompleted || isCancelled;
+
+  const googleMapsUrl = useMemo(() => {
+    if (!meeting) return null;
+    return buildGoogleMapsPlaceUrl(
+      meeting.core.location.lat,
+      meeting.core.location.lng
+    );
+  }, [meeting]);
 
   const flow = useMemo(() => {
     if (!meeting) return [];
@@ -109,8 +169,10 @@ export default function MeetingDetailPage() {
       String(value).trim() !== "" &&
       !Number.isNaN(Number(value));
 
+    // ✅ Fase 1
     const phase1Complete = true;
 
+    // ✅ Fase 2
     const phase2Complete =
       hasValue(meeting.raw?.Facebook1) &&
       hasValue(meeting.raw?.Youtube1) &&
@@ -119,11 +181,14 @@ export default function MeetingDetailPage() {
       hasNumber(meeting.raw?.YoutubeValor1) &&
       hasNumber(meeting.raw?.WhatsappValor1);
 
+    // ✅ Fase 3
     const phase3Complete =
       (meeting.metrics?.adultsCount ?? 0) + (meeting.metrics?.minorsCount ?? 0) > 0;
 
+    // ✅ Fase 4
     const phase4Complete = hasValue(meeting.raw?.FotoGrupal);
 
+    // ✅ Fase 5
     const phase5Complete =
       hasValue(meeting.raw?.Facebook2) &&
       hasValue(meeting.raw?.Youtube2) &&
@@ -132,6 +197,7 @@ export default function MeetingDetailPage() {
       hasNumber(meeting.raw?.YoutubeValor2) &&
       hasNumber(meeting.raw?.WhatsappValor2);
 
+    // ✅ Fase 6
     const phase6Complete = meeting.status === "COMPLETADA";
 
     return [
@@ -354,32 +420,125 @@ export default function MeetingDetailPage() {
       {summary}
 
       <Box sx={{ mt: 2 }}>
+        {/* =========================================================
+         * 🧾 FASE 1
+         * ========================================================= */}
         <PhasePanel active={activePhase === 1}>
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
-                Fase 1 · Alta de reunión 🧾
-              </Typography>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                justifyContent="space-between"
+                spacing={1.5}
+                sx={{ mb: 2 }}
+              >
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                    Fase 1 · Alta de reunión 🧾
+                  </Typography>
 
-              <Stack spacing={0.9}>
-                <Typography><strong>Tipo:</strong> {meeting.core.type}</Typography>
-                <Typography><strong>Fecha:</strong> {formatDateShort(meeting.core.dateISO)}</Typography>
-                <Typography><strong>Sede:</strong> {meeting.core.sede}</Typography>
-                <Typography><strong>Organizador:</strong> {meeting.core.organizer.name}</Typography>
-                <Typography><strong>Enlace:</strong> {meeting.core.enlace.name}</Typography>
-                <Typography><strong>Municipio:</strong> {meeting.core.municipio}</Typography>
-                <Typography><strong>Sección:</strong> {meeting.core.seccion}</Typography>
-                <Typography><strong>Distrito Local:</strong> {meeting.core.distritoLocal}</Typography>
-                <Typography><strong>Distrito Federal:</strong> {meeting.core.distritoFederal}</Typography>
-                <Typography><strong>Dirección:</strong> {meeting.core.address}</Typography>
-                <Typography>
-                  <strong>Coordenadas:</strong> {meeting.core.location.lat}, {meeting.core.location.lng}
-                </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Información general de la agenda, ubicación y acceso rápido al mapa 🗺️
+                  </Typography>
+                </Box>
+
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                >
+                  {googleMapsUrl ? (
+                    <Tooltip title="Abrir en Google Maps 🌍">
+                      <IconButton
+                        component="a"
+                        href={googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        color="primary"
+                        sx={{
+                          border: "1px solid rgba(108,56,65,0.18)",
+                          bgcolor: "rgba(108,56,65,0.06)",
+                          "&:hover": {
+                            bgcolor: "rgba(108,56,65,0.12)",
+                          },
+                        }}
+                      >
+                        <MapIcon />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+
+                  {!isReadOnly ? (
+                    <Button
+                      variant="contained"
+                      startIcon={<EditIcon />}
+                      onClick={() => navigate(`/meetings/${meeting.id}/edit`)}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Editar agenda ✏️
+                    </Button>
+                  ) : null}
+                </Stack>
               </Stack>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} lg={6}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      border: "1px solid rgba(0,0,0,0.06)",
+                      bgcolor: "#fff",
+                      height: "100%",
+                    }}
+                  >
+                    <InfoRow label="Tipo:" value={meeting.core.type} />
+                    <InfoRow label="Fecha:" value={formatDateShort(meeting.core.dateISO)} />
+                    <InfoRow label="Sede:" value={meeting.core.sede} />
+                    <InfoRow label="Organizador:" value={meeting.core.organizer.name} />
+                    <InfoRow label="Enlace:" value={meeting.core.enlace.name} />
+                    <InfoRow label="Municipio:" value={meeting.core.municipio} />
+                    <InfoRow label="Sección:" value={meeting.core.seccion} />
+                    <InfoRow label="Distrito Local:" value={meeting.core.distritoLocal} />
+                    <InfoRow label="Distrito Federal:" value={meeting.core.distritoFederal} />
+                    <InfoRow label="Dirección:" value={meeting.core.address} />
+                    <InfoRow
+                      label="Coordenadas:"
+                      value={`${meeting.core.location.lat}, ${meeting.core.location.lng}`}
+                    />
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12} lg={6}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      border: "1px solid rgba(0,0,0,0.06)",
+                      bgcolor: "#fff",
+                      height: "100%",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 900, mb: 1.2 }}>
+                      Ubicación en mapa 🗺️
+                    </Typography>
+
+                    <ReadOnlyMeetingMap
+                      lat={meeting.core.location.lat}
+                      lng={meeting.core.location.lng}
+                      address={meeting.core.address}
+                      height={320}
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
         </PhasePanel>
 
+        {/* =========================================================
+         * 📸 FASE 2
+         * ========================================================= */}
         <PhasePanel active={activePhase === 2}>
           <EvidenceUploadCard
             meeting={meeting}
@@ -391,6 +550,9 @@ export default function MeetingDetailPage() {
           />
         </PhasePanel>
 
+        {/* =========================================================
+         * 👥 FASE 3
+         * ========================================================= */}
         <PhasePanel active={activePhase === 3}>
           <AttendancePhaseSection
             agendaId={meeting.id}
@@ -398,6 +560,9 @@ export default function MeetingDetailPage() {
           />
         </PhasePanel>
 
+        {/* =========================================================
+         * 📷 FASE 4
+         * ========================================================= */}
         <PhasePanel active={activePhase === 4}>
           <PhotoGroupCapture
             meeting={meeting}
@@ -406,6 +571,9 @@ export default function MeetingDetailPage() {
           />
         </PhasePanel>
 
+        {/* =========================================================
+         * 📸 FASE 5
+         * ========================================================= */}
         <PhasePanel active={activePhase === 5}>
           <EvidenceUploadCard
             meeting={meeting}
@@ -417,6 +585,9 @@ export default function MeetingDetailPage() {
           />
         </PhasePanel>
 
+        {/* =========================================================
+         * ✅ FASE 6
+         * ========================================================= */}
         <PhasePanel active={activePhase === 6}>
           <Stack spacing={2}>
             <EvidenceComparePanel meeting={meeting} />
