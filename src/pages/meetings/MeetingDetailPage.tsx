@@ -91,6 +91,10 @@ export default function MeetingDetailPage() {
 
   const isCompleted = meeting?.status === "COMPLETADA";
   const isCancelled = meeting?.status === "OBSERVADA";
+
+  // 🔒 Solo lectura tanto para completadas como canceladas
+  const isReadOnly = Boolean(isCompleted || isCancelled);
+
   const disableFinalize = isCompleted || isCancelled;
 
   const flow = useMemo(() => {
@@ -105,10 +109,8 @@ export default function MeetingDetailPage() {
       String(value).trim() !== "" &&
       !Number.isNaN(Number(value));
 
-    // ✅ Fase 1
     const phase1Complete = true;
 
-    // ✅ Fase 2
     const phase2Complete =
       hasValue(meeting.raw?.Facebook1) &&
       hasValue(meeting.raw?.Youtube1) &&
@@ -117,14 +119,11 @@ export default function MeetingDetailPage() {
       hasNumber(meeting.raw?.YoutubeValor1) &&
       hasNumber(meeting.raw?.WhatsappValor1);
 
-    // ✅ Fase 3
     const phase3Complete =
       (meeting.metrics?.adultsCount ?? 0) + (meeting.metrics?.minorsCount ?? 0) > 0;
 
-    // ✅ Fase 4
     const phase4Complete = hasValue(meeting.raw?.FotoGrupal);
 
-    // ✅ Fase 5
     const phase5Complete =
       hasValue(meeting.raw?.Facebook2) &&
       hasValue(meeting.raw?.Youtube2) &&
@@ -133,7 +132,6 @@ export default function MeetingDetailPage() {
       hasNumber(meeting.raw?.YoutubeValor2) &&
       hasNumber(meeting.raw?.WhatsappValor2);
 
-    // ✅ Fase 6
     const phase6Complete = meeting.status === "COMPLETADA";
 
     return [
@@ -294,7 +292,7 @@ export default function MeetingDetailPage() {
 
             {isCancelled ? (
               <Alert severity="error" sx={{ mt: 1 }}>
-                Esta agenda fue cancelada 🚫
+                Esta agenda fue cancelada 🚫. El contenido se muestra en modo solo lectura.
               </Alert>
             ) : null}
           </Stack>
@@ -389,14 +387,14 @@ export default function MeetingDetailPage() {
             title="Fase 2 · Evidencia Inicial Digital"
             description="Sube o reemplaza Facebook, YouTube y WhatsApp con sus valores actuales."
             onUpdated={(m) => setMeeting(m)}
-            readOnly={Boolean(isCompleted)}
+            readOnly={isReadOnly}
           />
         </PhasePanel>
 
         <PhasePanel active={activePhase === 3}>
           <AttendancePhaseSection
             agendaId={meeting.id}
-            readOnly={Boolean(isCompleted)}
+            readOnly={isReadOnly}
           />
         </PhasePanel>
 
@@ -404,7 +402,7 @@ export default function MeetingDetailPage() {
           <PhotoGroupCapture
             meeting={meeting}
             onUpdated={(m) => setMeeting(m)}
-            readOnly={Boolean(isCompleted)}
+            readOnly={isReadOnly}
           />
         </PhasePanel>
 
@@ -415,7 +413,7 @@ export default function MeetingDetailPage() {
             title="Fase 5 · Evidencia Final Digital"
             description="Sube o reemplaza Facebook, YouTube y WhatsApp finales con sus valores actuales."
             onUpdated={(m) => setMeeting(m)}
-            readOnly={Boolean(isCompleted)}
+            readOnly={isReadOnly}
           />
         </PhasePanel>
 
